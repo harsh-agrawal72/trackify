@@ -19,11 +19,17 @@ export const HabitProvider = ({ children }) => {
 
   const getInitialValue = (key, defaultValue) => {
     try {
-      const newValue = localStorage.getItem(`trackify_${key}`);
+      const newValue = localStorage.getItem(`habbitz_${key}`);
       if (newValue) return JSON.parse(newValue);
       
-      const oldValue = localStorage.getItem(`momentum_${key}`);
-      if (oldValue) return JSON.parse(oldValue);
+      const habitzzValue = localStorage.getItem(`habitzz_${key}`);
+      if (habitzzValue) return JSON.parse(habitzzValue);
+      
+      const trackifyValue = localStorage.getItem(`trackify_${key}`);
+      if (trackifyValue) return JSON.parse(trackifyValue);
+      
+      const momentumValue = localStorage.getItem(`momentum_${key}`);
+      if (momentumValue) return JSON.parse(momentumValue);
       
       return defaultValue;
     } catch (e) {
@@ -43,12 +49,12 @@ export const HabitProvider = ({ children }) => {
   const [focusSessions, setFocusSessions] = useState(() => getInitialValue('focus_sessions', []));
 
   useEffect(() => {
-    localStorage.setItem('trackify_categories', JSON.stringify(categories));
-    localStorage.setItem('trackify_habits', JSON.stringify(habits));
-    localStorage.setItem('trackify_tasks', JSON.stringify(tasks));
-    localStorage.setItem('trackify_logs', JSON.stringify(logs));
-    localStorage.setItem('trackify_stats', JSON.stringify(userStats));
-    localStorage.setItem('trackify_focus_sessions', JSON.stringify(focusSessions));
+    localStorage.setItem('habbitz_categories', JSON.stringify(categories));
+    localStorage.setItem('habbitz_habits', JSON.stringify(habits));
+    localStorage.setItem('habbitz_tasks', JSON.stringify(tasks));
+    localStorage.setItem('habbitz_logs', JSON.stringify(logs));
+    localStorage.setItem('habbitz_stats', JSON.stringify(userStats));
+    localStorage.setItem('habbitz_focus_sessions', JSON.stringify(focusSessions));
   }, [categories, habits, tasks, logs, userStats, focusSessions]);
 
   useEffect(() => {

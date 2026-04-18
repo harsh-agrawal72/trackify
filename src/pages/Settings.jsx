@@ -43,7 +43,7 @@ const Settings = () => {
 
       <div>
         <h1 style={{ fontSize: '38px', fontWeight: '800', marginBottom: '8px' }}>Settings</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Customize your Trackify experience.</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Customize your habbitz experience.</p>
       </div>
 
       {/* Profile */}
@@ -160,17 +160,17 @@ const Settings = () => {
             <button
               onClick={() => {
                 const data = {
-                  habits: JSON.parse(localStorage.getItem('trackify_habits') || '[]'),
-                  logs: JSON.parse(localStorage.getItem('trackify_logs') || '[]'),
-                  tasks: JSON.parse(localStorage.getItem('trackify_tasks') || '[]'),
-                  categories: JSON.parse(localStorage.getItem('trackify_categories') || '[]'),
-                  userStats: JSON.parse(localStorage.getItem('trackify_stats') || '{}')
+                  habits: JSON.parse(localStorage.getItem('habbitz_habits') || '[]'),
+                  logs: JSON.parse(localStorage.getItem('habbitz_logs') || '[]'),
+                  tasks: JSON.parse(localStorage.getItem('habbitz_tasks') || '[]'),
+                  categories: JSON.parse(localStorage.getItem('habbitz_categories') || '[]'),
+                  userStats: JSON.parse(localStorage.getItem('habbitz_stats') || '{}')
                 };
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `trackify-backup-${new Date().toISOString().split('T')[0]}.json`;
+                a.download = `habbitz-backup-${new Date().toISOString().split('T')[0]}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
               }}
@@ -195,11 +195,11 @@ const Settings = () => {
                   reader.onload = (event) => {
                     try {
                       const data = JSON.parse(event.target.result);
-                      if (data.habits) localStorage.setItem('trackify_habits', JSON.stringify(data.habits));
-                      if (data.logs) localStorage.setItem('trackify_logs', JSON.stringify(data.logs));
-                      if (data.tasks) localStorage.setItem('trackify_tasks', JSON.stringify(data.tasks));
-                      if (data.categories) localStorage.setItem('trackify_categories', JSON.stringify(data.categories));
-                      if (data.userStats) localStorage.setItem('trackify_stats', JSON.stringify(data.userStats));
+                      if (data.habits) localStorage.setItem('habbitz_habits', JSON.stringify(data.habits));
+                      if (data.logs) localStorage.setItem('habbitz_logs', JSON.stringify(data.logs));
+                      if (data.tasks) localStorage.setItem('habbitz_tasks', JSON.stringify(data.tasks));
+                      if (data.categories) localStorage.setItem('habbitz_categories', JSON.stringify(data.categories));
+                      if (data.userStats) localStorage.setItem('habbitz_stats', JSON.stringify(data.userStats));
                       alert('Data imported successfully. The app will now reload.');
                       window.location.reload();
                     } catch (err) { alert('Failed to parse backup file.'); }

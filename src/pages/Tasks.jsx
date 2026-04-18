@@ -57,7 +57,7 @@ const Tasks = () => {
     worksheet['!cols'] = wscols;
 
     // 5. Trigger download
-    XLSX.writeFile(workbook, 'trackify-tasks.xlsx');
+    XLSX.writeFile(workbook, 'habbitz-tasks.xlsx');
   };
 
   let filteredTasks = tasks.filter(t => tab === 'single' ? t.type === 'task' : t.type === 'recurring_task');

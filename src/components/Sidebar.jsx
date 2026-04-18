@@ -22,7 +22,7 @@ const Sidebar = ({ currentView, setCurrentView, openModal }) => {
         <div style={{ background: 'var(--accent-primary)', padding: '8px', borderRadius: '12px', boxShadow: '0 4px 12px var(--accent-primary-dim)' }}>
           <Zap size={24} color="#FFF" fill="#FFF" />
         </div>
-        <h1 style={{ fontSize: '24px', margin: 0, fontWeight: 'bold' }}>Trackify</h1>
+        <h1 style={{ fontSize: '24px', margin: 0, fontWeight: 'bold' }}>habbitz</h1>
       </div>
 
       {/* New Activity Button */}

@@ -328,7 +328,7 @@ const Dashboard = () => {
                   <Zap size={32} color="var(--accent-primary)" />
                 </div>
                 <h3 style={{ fontSize: '18px', fontWeight: '800' }}>
-                  {habits.length === 0 ? "Your Trackify journey starts here!" : `No habits scheduled for ${format(currentDate, 'EEE')}`}
+                  {habits.length === 0 ? "Your habbitz journey starts here!" : `No habits scheduled for ${format(currentDate, 'EEE')}`}
                 </h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '14px', maxWidth: '280px', margin: '0 auto', lineHeight: 1.5 }}>
                   {habits.length === 0 
