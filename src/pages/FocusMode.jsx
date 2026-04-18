@@ -1,0 +1,291 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Play, Pause, RotateCcw, Brain, Coffee, Zap, Clock, CheckCircle2, TrendingUp } from 'lucide-react';
+import { useHabits } from '../context/HabitContext';
+import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns';
+import { showXPToast } from '../components/XPToast';
+
+const FocusMode = () => {
+  const [timeLeft, setTimeLeft] = useState(25 * 60);
+  const [totalTime, setTotalTime] = useState(25 * 60);
+  const [isActive, setIsActive] = useState(false);
+  const [mode, setMode] = useState('focus');
+  const [completedSessions, setCompletedSessions] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const { focusSessions, addFocusSession, userStats } = useHabits();
+
+  const modeConfig = {
+    focus: { color: 'var(--accent-primary)', label: 'Pomodoro', time: 25 * 60, icon: Brain, xp: 30 },
+    shortBreak: { color: 'var(--accent-success)', label: 'Short Break', time: 5 * 60, icon: Coffee, xp: 5 },
+    longBreak: { color: '#3498db', label: 'Long Break', time: 15 * 60, icon: Zap, xp: 10 },
+    custom: { color: 'var(--cat-yellow)', label: 'Custom', time: totalTime, icon: Clock, xp: 20 },
+  };
+
+  const currentModeConfig = modeConfig[mode];
+
+  useEffect(() => {
+    let interval = null;
+    if (isActive && timeLeft > 0) {
+      interval = setInterval(() => setTimeLeft(t => t - 1), 1000);
+    } else if (timeLeft === 0 && isActive) {
+      clearInterval(interval);
+      setIsActive(false);
+      handleSessionComplete();
+    }
+    return () => clearInterval(interval);
+  }, [isActive, timeLeft]);
+
+  const handleSessionComplete = () => {
+    setCompletedSessions(c => c + 1);
+    const sessionData = {
+      mode,
+      duration: Math.floor(modeConfig[mode].time / 60),
+      date: format(new Date(), 'yyyy-MM-dd'),
+      label: mode === 'custom' && customName ? customName : modeConfig[mode].label,
+    };
+    addFocusSession(sessionData);
+    showXPToast(`${modeConfig[mode].label} complete!`, modeConfig[mode].xp, 'streak');
+    // Play notification
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.8);
+    } catch(e) {}
+  };
+
+  const toggleTimer = () => setIsActive(!isActive);
+
+  const resetTimer = () => {
+    setIsActive(false);
+    setTimeLeft(modeConfig[mode].time);
+  };
+
+  const switchMode = (newMode) => {
+    setMode(newMode);
+    setIsActive(false);
+    const t = modeConfig[newMode].time;
+    setTotalTime(t);
+    setTimeLeft(t);
+  };
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const progressPct = 1 - timeLeft / Math.max(1, modeConfig[mode].time);
+  const circumference = 2 * Math.PI * 130;
+  const todaySessions = focusSessions.filter(s => s.date === format(new Date(), 'yyyy-MM-dd'));
+  const totalFocusMinutes = focusSessions.filter(s => s.mode === 'focus').reduce((a, b) => a + (b.duration || 0), 0);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ flex: 1 }}>
+          <h1 style={{ fontSize: 'min(36px, 8vw)', fontWeight: '800', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <Brain color={currentModeConfig.color} /> Focus Session
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Deep work builds extraordinary habits.</p>
+        </div>
+        <button
+          onClick={() => setShowHistory(!showHistory)}
+          style={{ background: 'var(--bg-elevated)', border: '1px solid var(--stroke-subtle)', borderRadius: '12px', padding: '10px 18px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}
+        >
+          <TrendingUp size={16} /> Stats
+        </button>
+      </div>
+
+      {/* Stats Strip */}
+      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--stroke-subtle)', borderRadius: '16px', padding: '12px', textAlign: 'center' }}>
+          <div style={{ fontSize: '24px', fontWeight: '800', color: currentModeConfig.color }}>{completedSessions}</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Session</div>
+        </div>
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--stroke-subtle)', borderRadius: '16px', padding: '12px', textAlign: 'center' }}>
+          <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--accent-success)' }}>{todaySessions.length}</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Today</div>
+        </div>
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--stroke-subtle)', borderRadius: '16px', padding: '12px', textAlign: 'center' }}>
+          <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--accent-warning)' }}>{totalFocusMinutes}</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Mins</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* Timer Panel */}
+        <div className="glass-panel" style={{ padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: '300px' }}>
+
+          {/* Mode Selector */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px', background: 'var(--bg-elevated)', padding: '8px', borderRadius: '24px', marginBottom: '36px', width: '100%' }}>
+            {Object.entries(modeConfig).map(([key, cfg]) => (
+              key !== 'custom' || true ? (
+                <button
+                  key={key}
+                  onClick={() => switchMode(key)}
+                  style={{
+                    padding: '8px 16px', fontSize: '13px', borderRadius: '16px', border: 'none', cursor: 'pointer',
+                    background: mode === key ? 'var(--bg-surface)' : 'transparent',
+                    color: mode === key ? cfg.color : 'var(--text-secondary)',
+                    fontWeight: mode === key ? 'bold' : 'normal',
+                    transition: 'all 0.2s', boxShadow: mode === key ? '0 2px 8px rgba(0,0,0,0.2)' : 'none'
+                  }}
+                >
+                  {cfg.label}
+                </button>
+              ) : null
+            ))}
+          </div>
+
+          {/* Custom Input */}
+          {mode === 'custom' && !isActive && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px', width: '100%', maxWidth: '320px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-elevated)', padding: '12px 16px', borderRadius: '16px' }}>
+                <input
+                  type="number" min="1" max="999"
+                  value={Math.floor(totalTime / 60)}
+                  onChange={(e) => {
+                    const val = Math.max(1, parseInt(e.target.value) || 1);
+                    setTotalTime(val * 60);
+                    setTimeLeft(val * 60);
+                  }}
+                  style={{ width: '60px', textAlign: 'center', fontSize: '18px', padding: '4px', background: 'transparent', border: 'none', borderBottom: '2px solid var(--cat-yellow)', color: 'var(--text-primary)', outline: 'none' }}
+                />
+                <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Minutes</span>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-elevated)', padding: '12px 16px', borderRadius: '16px' }}>
+                <input
+                  type="text"
+                  placeholder="Session Name (e.g. Reading)"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none', fontSize: '14px' }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Timer Display */}
+          <div style={{ position: 'relative', width: '280px', height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '40px' }}>
+            <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+              <circle cx="140" cy="140" r="130" stroke="var(--bg-elevated)" strokeWidth="8" fill="none" />
+              <circle
+                cx="140" cy="140" r="130"
+                stroke={currentModeConfig.color} strokeWidth="8" fill="none"
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference * (1 - progressPct)}
+                style={{ transition: 'stroke-dashoffset 1s linear', strokeLinecap: 'round' }}
+              />
+            </svg>
+            <div style={{ textAlign: 'center', zIndex: 1 }}>
+              <div style={{ fontSize: '72px', fontWeight: '800', fontFamily: 'monospace', color: currentModeConfig.color, letterSpacing: '-2px', lineHeight: 1 }}>
+                {formatTime(timeLeft)}
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                {currentModeConfig.label}
+              </div>
+              {isActive && (
+                <motion.div
+                  animate={{ opacity: [1, 0.4, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  style={{ marginTop: '8px', fontSize: '12px', color: currentModeConfig.color }}
+                >
+                  ● LIVE
+                </motion.div>
+              )}
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={toggleTimer}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                width: '180px', height: '56px', fontSize: '17px', fontWeight: '700', border: 'none', cursor: 'pointer', borderRadius: '18px',
+                color: isActive ? 'var(--text-primary)' : '#FFF',
+                background: isActive ? 'var(--bg-elevated)' : currentModeConfig.color,
+                boxShadow: isActive ? 'none' : `0 8px 24px -8px ${currentModeConfig.color}`,
+              }}
+            >
+              {isActive ? <Pause size={22} /> : <Play size={22} fill="currentColor" />}
+              {isActive ? 'Pause' : 'Start'}
+            </motion.button>
+
+            <motion.button
+              whileHover={{ rotate: -20 }}
+              onClick={resetTimer}
+              title="Reset Timer"
+              style={{
+                width: '56px', height: '56px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'var(--bg-elevated)', border: '1px solid var(--stroke-subtle)', cursor: 'pointer', color: 'var(--text-secondary)',
+              }}
+            >
+              <RotateCcw size={22} />
+            </motion.button>
+          </div>
+
+          {/* Session dots */}
+          {completedSessions > 0 && (
+            <div style={{ marginTop: '24px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Sessions:</span>
+              {Array.from({ length: completedSessions }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  style={{ width: '10px', height: '10px', borderRadius: '50%', background: currentModeConfig.color }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Session History Panel */}
+        <AnimatePresence>
+          {showHistory && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="glass-panel"
+              style={{ padding: '24px', flex: '1 1 300px', maxHeight: '500px', overflowY: 'auto' }}
+            >
+              <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '20px' }}>Session History</h3>
+              {focusSessions.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>No sessions yet. Start your first focus session!</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {focusSessions.slice(0, 20).map((session, i) => (
+                    <div key={session.id || i} style={{ padding: '12px 16px', background: 'var(--bg-elevated)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: '600' }}>{session.label}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{session.date}</div>
+                      </div>
+                      <div style={{ fontSize: '14px', color: modeConfig[session.mode]?.color || 'var(--accent-primary)', fontWeight: '700' }}>
+                        {session.duration}m
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+
+export default FocusMode;
