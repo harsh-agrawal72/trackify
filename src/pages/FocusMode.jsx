@@ -24,17 +24,55 @@ const FocusMode = () => {
 
   const currentModeConfig = modeConfig[mode];
 
+  const endTimeRef = useRef(null);
+  const onCompleteRef = useRef(handleSessionComplete);
+
+  // Keep handleSessionComplete ref up to date
+  useEffect(() => {
+    onCompleteRef.current = handleSessionComplete;
+  }, [handleSessionComplete]);
+
   useEffect(() => {
     let interval = null;
+
+    const tick = () => {
+      if (!endTimeRef.current) return;
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((endTimeRef.current - now) / 1000));
+      
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        setIsActive(false);
+        endTimeRef.current = null;
+        if (onCompleteRef.current) onCompleteRef.current();
+      }
+    };
+
     if (isActive && timeLeft > 0) {
-      interval = setInterval(() => setTimeLeft(t => t - 1), 1000);
-    } else if (timeLeft === 0 && isActive) {
-      clearInterval(interval);
-      setIsActive(false);
-      handleSessionComplete();
+      // Set the target end time when starting/resuming
+      endTimeRef.current = Date.now() + timeLeft * 1000;
+      
+      interval = setInterval(tick, 1000);
+
+      // Instantly sync when the tab becomes visible
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          tick();
+        }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      return () => {
+        clearInterval(interval);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    } else {
+      endTimeRef.current = null;
+      if (interval) clearInterval(interval);
     }
-    return () => clearInterval(interval);
-  }, [isActive, timeLeft]);
+  }, [isActive]);
 
   const handleSessionComplete = () => {
     setCompletedSessions(c => c + 1);
