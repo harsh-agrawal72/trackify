@@ -9,8 +9,11 @@ const HabitItem = memo(({ habit, logs }) => {
   const currentLog = logs.find(l => l.habitId === habit.id);
   const progress = currentLog ? currentLog.progress : 0;
   const isAtLeast = habit.goalType !== 'at_most';
-  const isCompleted = isAtLeast ? (progress >= habit.target) : (!!currentLog?.completedAt && progress <= habit.target); 
-  const isFailed = !isAtLeast && (habit.targetUnit === 'binary' ? progress > 0 : progress > habit.target);
+  const isAtMostBinary = !isAtLeast && habit.targetUnit === 'binary';
+  const isCompleted = isAtLeast 
+    ? (progress >= habit.target) 
+    : (!!currentLog?.completedAt && (isAtMostBinary ? progress === 0 : progress <= habit.target)); 
+  const isFailed = !isAtLeast && (isAtMostBinary ? progress > 0 : progress > habit.target);
   const isSucceeding = !isAtLeast && !isFailed;
   
   const progressPercent = Math.min((progress / habit.target) * 100, 100);

@@ -51,7 +51,10 @@ const Today = () => {
       const cat = categories.find(c => c.id === h.categoryId) || {};
       const log = todaysLogs.find(l => l.habitId === h.id);
       const isAtMost = h.goalType === 'at_most';
-      const isCompleted = isAtMost ? (log && log.completedAt && log.progress <= h.target) : (log && log.progress >= h.target);
+      const isAtMostBinary = isAtMost && h.targetUnit === 'binary';
+      const isCompleted = isAtMost 
+        ? (log && log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= h.target)) 
+        : (log && log.progress >= h.target);
       return { 
         id: h.id, type: h.type || 'habit', name: h.name, subtitle: h.type === 'recurring_task' ? 'Recurring Task' : 'Habit', 
         categoryId: h.categoryId, categoryColor: cat.color || '#555', categoryIcon: cat.icon || 'Clock',

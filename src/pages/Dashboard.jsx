@@ -79,7 +79,8 @@ const Dashboard = () => {
     const log = logsToday.find(l => l.habitId === h.id);
     if (!log) return false;
     const isAtMost = h.goalType === 'at_most';
-    return isAtMost ? (log.completedAt && log.progress <= h.target) : (log.progress >= h.target);
+    const isAtMostBinary = isAtMost && h.targetUnit === 'binary';
+    return isAtMost ? (log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= h.target)) : (log.progress >= h.target);
   }).length;
 
   const totalActive = activeHabitsForDate.length;
@@ -220,7 +221,8 @@ const Dashboard = () => {
               const h = habits.find(hb => hb.id === l.habitId);
               if (!h) return false;
               const isAtMost = h.goalType === 'at_most';
-              return isAtMost ? (l.completedAt && l.progress <= h.target) : (l.progress >= h.target);
+              const isAtMostBinary = isAtMost && h.targetUnit === 'binary';
+              return isAtMost ? (l.completedAt && (isAtMostBinary ? l.progress === 0 : l.progress <= h.target)) : (l.progress >= h.target);
             });
             return (
               <button

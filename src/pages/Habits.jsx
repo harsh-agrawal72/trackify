@@ -50,7 +50,10 @@ const Habits = () => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const log = logs.find(l => l.habitId === habit.id && l.date === dateStr);
     const isAtMost = habit.goalType === 'at_most';
-    const isCompleted = isAtMost ? (log && log.completedAt && log.progress <= habit.target) : (log && log.progress >= habit.target);
+    const isAtMostBinary = isAtMost && habit.targetUnit === 'binary';
+    const isCompleted = isAtMost 
+      ? (log && log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= habit.target)) 
+      : (log && log.progress >= habit.target);
     
     // Toggle completion: if complete -> 0, if incomplete -> target (or 0 for at_most)
     const amount = isCompleted ? -log.progress : (isAtMost ? 0 : habit.target - (log?.progress || 0));
@@ -76,7 +79,10 @@ const Habits = () => {
         const dateStr = format(d, 'yyyy-MM-dd');
         const log = logs.find(l => l.habitId === habitId && l.date === dateStr);
         const isAtMost = habit.goalType === 'at_most';
-        const isSuccessful = isAtMost ? (log && log.completedAt && log.progress <= habit.target) : (log && log.progress >= habit.target);
+        const isAtMostBinary = isAtMost && habit.targetUnit === 'binary';
+        const isSuccessful = isAtMost 
+          ? (log && log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= habit.target)) 
+          : (log && log.progress >= habit.target);
         if (isSuccessful) completedCount++;
       }
     });
@@ -108,7 +114,10 @@ const Habits = () => {
       if (!(habit.frequencyDays || [0,1,2,3,4,5,6]).includes(d.getDay())) continue;
       const dateStr = format(d, 'yyyy-MM-dd');
       const log = logs.find(l => l.habitId === habit.id && l.date === dateStr);
-      const isSuccessful = isAtMost ? (log && log.completedAt && log.progress <= habit.target) : (log && log.progress >= habit.target);
+      const isAtMostBinary = isAtMost && habit.targetUnit === 'binary';
+      const isSuccessful = isAtMost 
+        ? (log && log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= habit.target)) 
+        : (log && log.progress >= habit.target);
       
       if (isSuccessful) {
         currentStreak++;
@@ -129,7 +138,10 @@ const Habits = () => {
       totalScheduled++;
       const dateStr = format(d, 'yyyy-MM-dd');
       const log = logs.find(l => l.habitId === habit.id && l.date === dateStr);
-      const isSuccessful = isAtMost ? (log && log.completedAt && log.progress <= habit.target) : (log && log.progress >= habit.target);
+      const isAtMostBinary = isAtMost && habit.targetUnit === 'binary';
+      const isSuccessful = isAtMost 
+        ? (log && log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= habit.target)) 
+        : (log && log.progress >= habit.target);
       if (isSuccessful) totalCompleted++;
     }
     const completionRate = totalScheduled === 0 ? 0 : Math.round((totalCompleted / totalScheduled) * 100);
@@ -165,7 +177,10 @@ const Habits = () => {
             const dateStr = format(date, 'yyyy-MM-dd');
             const log = logs.find(l => l.habitId === habit.id && l.date === dateStr);
             const isAtMost = habit.goalType === 'at_most';
-            const isCompleted = isAtMost ? (log && log.completedAt && log.progress <= habit.target) : (log && log.progress >= habit.target);
+            const isAtMostBinary = isAtMost && habit.targetUnit === 'binary';
+            const isCompleted = isAtMost 
+              ? (log && log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= habit.target)) 
+              : (log && log.progress >= habit.target);
             const isToday = isSameDay(date, new Date());
             
             const startD = new Date(habit.startDate || '2000-01-01');
@@ -342,7 +357,10 @@ const Habits = () => {
                   const d = subDays(new Date(), 27 - i);
                   const log = logs.find(l => l.habitId === selectedHabitHistory.id && l.date === format(d, 'yyyy-MM-dd'));
                   const isAtMost = selectedHabitHistory.goalType === 'at_most';
-                  const isCompleted = isAtMost ? (log && log.completedAt && log.progress <= selectedHabitHistory.target) : (log && log.progress >= selectedHabitHistory.target);
+                  const isAtMostBinary = isAtMost && selectedHabitHistory.targetUnit === 'binary';
+                  const isCompleted = isAtMost 
+                    ? (log && log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= selectedHabitHistory.target)) 
+                    : (log && log.progress >= selectedHabitHistory.target);
                   return (
                     <div key={i} title={format(d, 'MMM d')} style={{ height: '30px', borderRadius: '4px', background: isCompleted ? 'var(--accent-primary)' : 'var(--bg-elevated)', opacity: isCompleted ? 1 : 0.3 }} />
                   );

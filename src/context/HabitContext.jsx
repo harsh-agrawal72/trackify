@@ -143,9 +143,17 @@ export const HabitProvider = ({ children }) => {
     let isCompletedToday = false;
     const isAtMost = habit.goalType === 'at_most';
     
+    const checkSuccess = (h, prog) => {
+      if (h.goalType === 'at_most') {
+        if (h.targetUnit === 'binary') return prog === 0;
+        return prog <= h.target;
+      }
+      return prog >= h.target;
+    };
+
     if (existingIndex >= 0) {
       const oldProgress = newLogs[existingIndex].progress;
-      const wasSuccessful = isAtMost ? (oldProgress <= habit.target) : (oldProgress >= habit.target);
+      const wasSuccessful = checkSuccess(habit, oldProgress);
       const wasConfirmedDone = !!newLogs[existingIndex].completedAt;
 
       if (amount === 0 && isAtMost) {
@@ -168,7 +176,7 @@ export const HabitProvider = ({ children }) => {
         const maxLimit = isAtMost ? Infinity : habit.target;
         newLogs[existingIndex].progress = Math.max(0, Math.min(oldProgress + amount, maxLimit));
         const newProgress = newLogs[existingIndex].progress;
-        const isSuccessfulNow = isAtMost ? (newProgress <= habit.target) : (newProgress >= habit.target);
+        const isSuccessfulNow = checkSuccess(habit, newProgress);
 
         if (isSuccessfulNow && !wasSuccessful) {
           const xp = calculateEntityXP(habit);
@@ -189,12 +197,13 @@ export const HabitProvider = ({ children }) => {
       if (amount <= 0 && !isAtMost) return; 
       
       const newProgress = amount;
+      const isSuccessfulNow = checkSuccess(habit, newProgress);
+
       newLogs.push({ 
         id: uuidv4(), habitId, date: dateStr, progress: newProgress, 
-        completedAt: (!isAtMost && newProgress >= habit.target) ? new Date().toISOString() : null 
+        completedAt: (!isAtMost && isSuccessfulNow) ? new Date().toISOString() : null 
       });
 
-      const isSuccessfulNow = isAtMost ? (newProgress <= habit.target) : (newProgress >= habit.target);
       if (!isAtMost && isSuccessfulNow) isCompletedToday = true;
       if (isAtMost && !isSuccessfulNow) {
          updateXP(-calculateEntityXP(habit), habit.name, 'habit', "Limit Exceeded! ⚠️");
