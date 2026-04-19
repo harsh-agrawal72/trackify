@@ -6,13 +6,25 @@ import Dashboard from './pages/Dashboard';
 import HabitModal from './components/HabitModal';
 import XPToastContainer from './components/XPToast';
 
+// Helper to handle ChunkLoadError (caused by new deployments and stale clients)
+const lazyWithRetry = (componentImport) =>
+  lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error) {
+      console.error("Chunk load failed, reloading...", error);
+      window.location.reload();
+      return { default: () => null };
+    }
+  });
+
 // Lazy load non-essential pages for better initial performance
-const Habits = lazy(() => import('./pages/Habits'));
-const Tasks = lazy(() => import('./pages/Tasks'));
-const Categories = lazy(() => import('./pages/Categories'));
-const Analytics = lazy(() => import('./pages/Analytics'));
-const Settings = lazy(() => import('./pages/Settings'));
-const FocusMode = lazy(() => import('./pages/FocusMode'));
+const Habits = lazyWithRetry(() => import('./pages/Habits'));
+const Tasks = lazyWithRetry(() => import('./pages/Tasks'));
+const Categories = lazyWithRetry(() => import('./pages/Categories'));
+const Analytics = lazyWithRetry(() => import('./pages/Analytics'));
+const Settings = lazyWithRetry(() => import('./pages/Settings'));
+const FocusMode = lazyWithRetry(() => import('./pages/FocusMode'));
 
 function App() {
   const [currentView, setCurrentView] = useState('today');

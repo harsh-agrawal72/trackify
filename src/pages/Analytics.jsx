@@ -211,13 +211,13 @@ const Analytics = () => {
       </div>
 
       {/* Charts Grid */}
-      <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+      <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', gap: '24px' }}>
 
         {/* 14-Day Velocity */}
         <div style={panelStyle}>
           <h3 style={{ marginBottom: '24px', fontSize: '18px', fontWeight: '700' }}>14-Day Velocity</h3>
-          <div style={{ width: '100%', height: '250px' }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div style={{ width: '100%', height: '250px', minWidth: 0, position: 'relative' }}>
+            <ResponsiveContainer width="100%" height="100%" debounce={50} minWidth={0} minHeight={0}>
               <AreaChart data={last14Days} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
@@ -237,9 +237,9 @@ const Analytics = () => {
         {/* Category Distribution */}
         <div style={panelStyle}>
           <h3 style={{ marginBottom: '24px', fontSize: '18px', fontWeight: '700' }}>Category Distribution (30 Days)</h3>
-          <div style={{ width: '100%', height: '250px' }}>
+          <div style={{ width: '100%', height: '250px', minWidth: 0, position: 'relative' }}>
             {categoryData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" debounce={50} minWidth={0} minHeight={0}>
                 <PieChart>
                   <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value">
                     {categoryData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
@@ -260,9 +260,9 @@ const Analytics = () => {
         <div style={panelStyle}>
           <h3 style={{ marginBottom: '8px', fontSize: '18px', fontWeight: '700' }}>Mood Trend (14 Days)</h3>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px' }}>1=Rough, 5=Amazing</p>
-          <div style={{ width: '100%', height: '220px' }}>
+          <div style={{ width: '100%', height: '220px', minWidth: 0, position: 'relative' }}>
             {moodData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" debounce={50} minWidth={0} minHeight={0}>
                 <LineChart data={moodData} margin={{ top: 10, right: 10, left: -30, bottom: 0 }}>
                   <XAxis dataKey="name" stroke="var(--text-muted)" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
                   <YAxis domain={[1, 5]} ticks={[1,2,3,4,5]} stroke="var(--text-muted)" tick={{ fill: 'var(--text-secondary)' }} />
@@ -284,8 +284,8 @@ const Analytics = () => {
         {/* Focus Minutes */}
         <div style={panelStyle}>
           <h3 style={{ marginBottom: '24px', fontSize: '18px', fontWeight: '700' }}>Daily Focus Minutes (7 Days)</h3>
-          <div style={{ width: '100%', height: '220px' }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div style={{ width: '100%', height: '220px', minWidth: 0, position: 'relative' }}>
+            <ResponsiveContainer width="100%" height="100%" debounce={50} minWidth={0} minHeight={0}>
               <BarChart data={focusData} margin={{ top: 10, right: 10, left: -30, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--stroke-subtle)" vertical={false} />
                 <XAxis dataKey="name" stroke="var(--text-muted)" tick={{ fill: 'var(--text-secondary)' }} />
@@ -300,8 +300,8 @@ const Analytics = () => {
         {/* Weekly Comparison - full width */}
         <div style={{ ...panelStyle, gridColumn: '1 / -1' }}>
           <h3 style={{ marginBottom: '24px', fontSize: '18px', fontWeight: '700' }}>Weekly Progress Comparison</h3>
-          <div style={{ width: '100%', height: '280px' }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div style={{ width: '100%', height: '280px', minWidth: 0, position: 'relative' }}>
+            <ResponsiveContainer width="100%" height="100%" debounce={50} minWidth={0} minHeight={0}>
               <BarChart data={weekData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--stroke-subtle)" vertical={false} />
                 <XAxis dataKey="name" stroke="var(--text-muted)" tick={{ fill: 'var(--text-secondary)' }} />

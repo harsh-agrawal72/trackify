@@ -231,12 +231,14 @@ export const HabitProvider = ({ children }) => {
     }
   }, [logs, habits, selectedDate, calculateEntityXP, updateXP]);
 
+  const clearFocusSessions = useCallback(() => setFocusSessions([]), []);
+
   const value = useMemo(() => ({
     categories, habits, tasks, logs, selectedDate, setSelectedDate, userStats, setUserStats, focusSessions,
-    addCategory, editCategory, deleteCategory, addHabit, editHabit, deleteHabit, addTask, editTask, toggleTask, deleteTask, getLogsForDate, logHabitProgress, updatePreferences, resetData, addFocusSession
+    addCategory, editCategory, deleteCategory, addHabit, editHabit, deleteHabit, addTask, editTask, toggleTask, deleteTask, getLogsForDate, logHabitProgress, updatePreferences, resetData, addFocusSession, clearFocusSessions
   }), [
     categories, habits, tasks, logs, selectedDate, userStats, focusSessions,
-    addCategory, editCategory, deleteCategory, addHabit, editHabit, deleteHabit, addTask, editTask, toggleTask, deleteTask, getLogsForDate, logHabitProgress, updatePreferences, resetData, addFocusSession
+    addCategory, editCategory, deleteCategory, addHabit, editHabit, deleteHabit, addTask, editTask, toggleTask, deleteTask, getLogsForDate, logHabitProgress, updatePreferences, resetData, addFocusSession, clearFocusSessions
   ]);
 
   return (

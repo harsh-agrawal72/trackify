@@ -317,6 +317,11 @@ input::placeholder { color: var(--text-muted); }
   animation: glow-pulse 2s ease-in-out infinite;
 }
 
+@keyframes dashArray {
+  0% { stroke-dasharray: 0 1000; }
+  100% { stroke-dasharray: 1000 1000; }
+}
+
 /* Bottom Navigation (Mobile Only) */
 .bottom-nav {
   display: none;
