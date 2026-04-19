@@ -210,10 +210,9 @@ export const HabitProvider = ({ children }) => {
         const completedAfter = [...newLogs].filter(l => {
           const h = habits.find(hb => hb.id === l.habitId);
           if (!h) return false;
-          return h.goalType === 'at_most' ? l.progress <= h.target : l.progress >= h.target;
+          return h.goalType === 'at_most' ? (l.completedAt && l.progress <= h.target) : l.progress >= h.target;
         });
-        const unloggedAtMost = todayActiveDayHabits.filter(h => h.goalType === 'at_most' && !newLogs.find(l => l.habitId === h.id && l.date === dateStr));
-        const isPerfectDay = todayActiveDayHabits.length > 0 && (completedAfter.length + unloggedAtMost.length) >= todayActiveDayHabits.length;
+        const isPerfectDay = todayActiveDayHabits.length > 0 && completedAfter.length >= todayActiveDayHabits.length;
         if (isPerfectDay && !prev.hadPerfectDay) {
           setTimeout(() => showXPToast('Perfect Day! All habits done! 🌟', 100, 'achievement'), 800);
           return { ...prev, xp: prev.xp + 100, hadPerfectDay: true };

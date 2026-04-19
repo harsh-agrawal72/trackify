@@ -16,7 +16,10 @@ const Analytics = () => {
       let completed = 0;
       dayLogs.forEach(log => {
         const h = habits.find(hab => hab.id === log.habitId);
-        if (h && log.progress >= h.target) completed++;
+        if (!h) return;
+        const isAtMost = h.goalType === 'at_most';
+        const isSuccessful = isAtMost ? (log.completedAt && log.progress <= h.target) : (log.progress >= h.target);
+        if (isSuccessful) completed++;
       });
       return { name: format(d, 'd MMM'), completed };
     });
@@ -33,7 +36,10 @@ const Analytics = () => {
     let completedCount = 0;
     dayLogs.forEach(log => {
       const h = habits.find(hab => hab.id === log.habitId);
-      if (h && log.progress >= h.target) completedCount++;
+      if (!h) return;
+      const isAtMost = h.goalType === 'at_most';
+      const isSuccessful = isAtMost ? (log.completedAt && log.progress <= h.target) : (log.progress >= h.target);
+      if (isSuccessful) completedCount++;
     });
     const intensity = Math.min(completedCount / maxHabits, 1);
     if (intensity === 0) return 'var(--bg-elevated)';
@@ -48,7 +54,10 @@ const Analytics = () => {
     const categoryDataRaw = {};
     last30DaysLogs.forEach(log => {
       const h = habits.find(hab => hab.id === log.habitId);
-      if (h && log.progress >= h.target) {
+      if (!h) return;
+      const isAtMost = h.goalType === 'at_most';
+      const isSuccessful = isAtMost ? (log.completedAt && log.progress <= h.target) : (log.progress >= h.target);
+      if (isSuccessful) {
         categoryDataRaw[h.categoryId] = (categoryDataRaw[h.categoryId] || 0) + 1;
       }
     });
@@ -66,8 +75,8 @@ const Analytics = () => {
       const currentLogs = logs.filter(l => l.date === format(currentDay, 'yyyy-MM-dd'));
       const prevLogs = logs.filter(l => l.date === format(prevDay, 'yyyy-MM-dd'));
       let cc = 0, pc = 0;
-      currentLogs.forEach(log => { const h = habits.find(hab => hab.id === log.habitId); if (h && log.progress >= h.target) cc++; });
-      prevLogs.forEach(log => { const h = habits.find(hab => hab.id === log.habitId); if (h && log.progress >= h.target) pc++; });
+      currentLogs.forEach(log => { const h = habits.find(hab => hab.id === log.habitId); if (h) { const isAtMost = h.goalType === 'at_most'; if (isAtMost ? (log.completedAt && log.progress <= h.target) : (log.progress >= h.target)) cc++; } });
+      prevLogs.forEach(log => { const h = habits.find(hab => hab.id === log.habitId); if (h) { const isAtMost = h.goalType === 'at_most'; if (isAtMost ? (log.completedAt && log.progress <= h.target) : (log.progress >= h.target)) pc++; } });
       return { name: format(currentDay, 'EEE'), ThisWeek: cc, LastWeek: pc };
     });
   }, [logs, habits]);
@@ -91,7 +100,9 @@ const Analytics = () => {
         const d = subDays(new Date(), i);
         if (!(h.frequencyDays || [0,1,2,3,4,5,6]).includes(d.getDay())) continue;
         const log = logs.find(l => l.habitId === h.id && l.date === format(d, 'yyyy-MM-dd'));
-        if (log && log.progress >= h.target) streak++;
+        const isAtMost = h.goalType === 'at_most';
+        const isSuccessful = isAtMost ? (log && log.completedAt && log.progress <= h.target) : (log && log.progress >= h.target);
+        if (isSuccessful) streak++;
         else if (i !== 0) break;
       }
       return { ...h, completions: habitLogs.length, streak };

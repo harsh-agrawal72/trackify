@@ -77,9 +77,9 @@ const Dashboard = () => {
 
   const completedCount = activeHabitsForDate.filter(h => {
     const log = logsToday.find(l => l.habitId === h.id);
-    const progress = log ? log.progress : 0;
+    if (!log) return false;
     const isAtMost = h.goalType === 'at_most';
-    return isAtMost ? progress <= h.target : (log && progress >= h.target);
+    return isAtMost ? (log.completedAt && log.progress <= h.target) : (log.progress >= h.target);
   }).length;
 
   const totalActive = activeHabitsForDate.length;
@@ -218,7 +218,9 @@ const Dashboard = () => {
             const dayLogs = logs.filter(l => l.date === format(d, 'yyyy-MM-dd'));
             const hasActivity = dayLogs.some(l => {
               const h = habits.find(hb => hb.id === l.habitId);
-              return h && l.progress >= h.target;
+              if (!h) return false;
+              const isAtMost = h.goalType === 'at_most';
+              return isAtMost ? (l.completedAt && l.progress <= h.target) : (l.progress >= h.target);
             });
             return (
               <button
