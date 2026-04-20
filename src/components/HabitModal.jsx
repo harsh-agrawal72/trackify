@@ -4,7 +4,7 @@ import { X, Trophy, Repeat, CheckCircle, Hash, Clock, CheckSquare, Ban } from 'l
 import { useHabits } from '../context/HabitContext';
 
 const HabitModal = ({ onClose, editData }) => {
-  const { addHabit, editHabit, addTask, editTask, categories } = useHabits();
+  const { addHabit, editHabit, addTask, editTask, categories, requestNotificationPermission } = useHabits();
   const [step, setStep] = useState(editData ? (editData.type === 'habit' ? 'habit_form' : (editData.type === 'recurring_task' ? 'recurring_form' : 'task_form')) : 'menu');
   
   const [formData, setFormData] = useState({
@@ -21,6 +21,9 @@ const HabitModal = ({ onClose, editData }) => {
     timeOfDay: editData?.timeOfDay || 'Anytime',
     difficulty: editData?.difficulty || 'Medium',
     reminderTime: editData?.reminderTime || '08:00',
+    reminderEndTime: editData?.reminderEndTime || '22:00',
+    reminderType: editData?.reminderType || 'fixed',
+    reminderInterval: editData?.reminderInterval || 60,
     isReminderEnabled: !!editData?.reminderTime
   });
 
@@ -58,7 +61,10 @@ const HabitModal = ({ onClose, editData }) => {
       priority: formData.priority,
       notes: formData.notes,
       difficulty: formData.difficulty,
-      reminderTime: formData.isReminderEnabled ? formData.reminderTime : null
+      reminderTime: formData.isReminderEnabled ? formData.reminderTime : null,
+      reminderEndTime: formData.reminderEndTime,
+      reminderType: formData.reminderType,
+      reminderInterval: formData.reminderInterval
     };
 
     if (step === 'habit_form') {
@@ -350,30 +356,80 @@ const HabitModal = ({ onClose, editData }) => {
                  </div>
               </div>
 
-              <div style={{ padding: '16px', borderRadius: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--stroke-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+               <div style={{ padding: '16px', borderRadius: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--stroke-subtle)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ fontWeight: '500' }}>Enable Reminder</div>
-                    {formData.isReminderEnabled && (
-                      <input 
-                        type="time" 
-                        value={formData.reminderTime} 
-                        onChange={(e) => setFormData({...formData, reminderTime: e.target.value})}
-                        style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--stroke-strong)', background: 'var(--bg-surface)' }}
-                      />
-                    )}
-                 </div>
-                 <button 
-                  type="button"
-                  onClick={() => setFormData({...formData, isReminderEnabled: !formData.isReminderEnabled})}
-                  style={{ 
-                    width: '48px', height: '26px', borderRadius: '13px', 
-                    background: formData.isReminderEnabled ? 'var(--accent-primary)' : 'var(--stroke-strong)',
-                    position: 'relative', border: 'none', cursor: 'pointer', transition: 'all 0.2s'
-                  }}
-                 >
-                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#000', position: 'absolute', top: '3px', left: formData.isReminderEnabled ? '25px' : '3px', transition: 'all 0.2s' }} />
-                 </button>
-              </div>
+                    <button 
+                      type="button"
+                      onClick={async () => {
+                        const newState = !formData.isReminderEnabled;
+                        if (newState) await requestNotificationPermission();
+                        setFormData({...formData, isReminderEnabled: newState});
+                      }}
+                      style={{ 
+                        width: '48px', height: '26px', borderRadius: '13px', 
+                        background: formData.isReminderEnabled ? 'var(--accent-primary)' : 'var(--stroke-strong)',
+                        position: 'relative', border: 'none', cursor: 'pointer', transition: 'all 0.2s'
+                      }}
+                    >
+                      <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#000', position: 'absolute', top: '3px', left: formData.isReminderEnabled ? '25px' : '3px', transition: 'all 0.2s' }} />
+                    </button>
+                  </div>
+
+                  {formData.isReminderEnabled && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--stroke-subtle)', paddingTop: '12px' }}>
+                      <div className="segmented-control" style={{ marginBottom: '8px' }}>
+                        <button type="button" className={`segmented-item ${formData.reminderType === 'fixed' ? 'active' : ''}`} onClick={() => setFormData({...formData, reminderType: 'fixed'})}>Fixed Time</button>
+                        <button type="button" className={`segmented-item ${formData.reminderType === 'interval' ? 'active' : ''}`} onClick={() => setFormData({...formData, reminderType: 'interval'})}>Interval</button>
+                      </div>
+
+                      {formData.reminderType === 'fixed' ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Notify at:</span>
+                          <input 
+                            type="time" 
+                            value={formData.reminderTime} 
+                            onChange={(e) => setFormData({...formData, reminderTime: e.target.value})}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--stroke-strong)', background: 'var(--bg-surface)', width: '120px' }}
+                          />
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Repeat every:</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <input 
+                                type="number" min="1"
+                                value={formData.reminderInterval} 
+                                onChange={(e) => setFormData({...formData, reminderInterval: parseInt(e.target.value) || 1})}
+                                style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--stroke-strong)', background: 'var(--bg-surface)', width: '60px', textAlign: 'center' }}
+                              />
+                              <span style={{ fontSize: '13px' }}>mins</span>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>From:</span>
+                            <input 
+                              type="time" 
+                              value={formData.reminderTime} 
+                              onChange={(e) => setFormData({...formData, reminderTime: e.target.value})}
+                              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--stroke-strong)', background: 'var(--bg-surface)', width: '120px' }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Until:</span>
+                            <input 
+                              type="time" 
+                              value={formData.reminderEndTime} 
+                              onChange={(e) => setFormData({...formData, reminderEndTime: e.target.value})}
+                              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--stroke-strong)', background: 'var(--bg-surface)', width: '120px' }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+               </div>
 
               <div>
                 <label style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', display: 'block' }}>Notes & Motivation</label>

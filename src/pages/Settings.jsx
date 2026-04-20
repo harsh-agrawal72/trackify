@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useHabits } from '../context/HabitContext';
-import { User, Volume2, ShieldAlert, Check, Download, Palette, Info } from 'lucide-react';
+import { User, Volume2, ShieldAlert, Check, Download, Palette, Info, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const ACCENT_COLORS = [
@@ -15,7 +15,7 @@ const ACCENT_COLORS = [
 ];
 
 const Settings = () => {
-  const { userStats, updatePreferences, resetData } = useHabits();
+  const { userStats, updatePreferences, resetData, notificationPermission, requestNotificationPermission, sendNotification, resetNotificationFlags } = useHabits();
   const [name, setName] = useState(userStats.preferences?.name || '');
   const [isSaved, setIsSaved] = useState(false);
 
@@ -143,6 +143,66 @@ const Settings = () => {
               boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
             }} />
           </button>
+        </div>
+      </div>
+
+      {/* Notifications */}
+      <div style={sectionStyle}>
+        <h2 style={{ fontSize: '20px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Bell color="var(--accent-primary)" /> Notifications
+        </h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={rowStyle}>
+            <div>
+              <div style={{ fontWeight: '600', marginBottom: '4px' }}>System Permission</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Status: <span style={{ color: notificationPermission === 'granted' ? 'var(--accent-success)' : 'var(--accent-danger)', fontWeight: 'bold' }}>{notificationPermission.toUpperCase()}</span></div>
+            </div>
+            {notificationPermission !== 'granted' && (
+              <button 
+                onClick={requestNotificationPermission}
+                className="btn btn-primary" 
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+              >
+                Enable
+              </button>
+            )}
+          </div>
+          
+          <div style={rowStyle}>
+            <div>
+              <div style={{ fontWeight: '600', marginBottom: '4px' }}>Test Notifications</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Verify that reminders will reach your desktop.</div>
+            </div>
+            <button 
+              onClick={() => sendNotification('Test Reminder 🔔', 'This is how your habit reminders will look!', 'test-notification')}
+              className="btn" 
+              style={{ background: 'var(--bg-base)', border: '1px solid var(--stroke-subtle)', color: 'var(--text-primary)', flexShrink: 0 }}
+              disabled={notificationPermission !== 'granted'}
+            >
+              Send Test
+            </button>
+          </div>
+
+          {notificationPermission === 'granted' && (
+            <div style={{ ...rowStyle, background: 'rgba(216, 75, 107, 0.05)', border: '1px dashed rgba(216, 75, 107, 0.2)', padding: '12px', borderRadius: '12px' }}>
+              <div>
+                <div style={{ fontWeight: '600', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShieldAlert size={16} color="var(--accent-primary)" /> Debug Mode
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Clear "already notified" flags for testing.</div>
+              </div>
+              <button 
+                onClick={() => {
+                  resetNotificationFlags();
+                  alert("Notification flags reset! You can now test reminders again.");
+                }}
+                className="btn btn-secondary" 
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+              >
+                Reset Status
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

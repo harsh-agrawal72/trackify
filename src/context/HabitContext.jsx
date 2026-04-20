@@ -7,35 +7,36 @@ const HabitContext = createContext();
 
 export const useHabits = () => useContext(HabitContext);
 
+const defaultCategories = [
+  { id: '1', name: 'Work', color: 'var(--cat-purple)', icon: 'Briefcase' },
+  { id: '2', name: 'Health', color: 'var(--cat-yellow)', icon: 'Activity' },
+  { id: '3', name: 'Personal', color: 'var(--cat-red)', icon: 'User' },
+  { id: '4', name: 'Study', color: 'var(--cat-pink)', icon: 'Book' },
+];
+
+const getInitialValue = (key, defaultValue) => {
+  try {
+    const newValue = localStorage.getItem(`habbitz_${key}`);
+    if (newValue) return JSON.parse(newValue);
+    
+    const habitzzValue = localStorage.getItem(`habitzz_${key}`);
+    if (habitzzValue) return JSON.parse(habitzzValue);
+    
+    const trackifyValue = localStorage.getItem(`trackify_${key}`);
+    if (trackifyValue) return JSON.parse(trackifyValue);
+    
+    const momentumValue = localStorage.getItem(`momentum_${key}`);
+    if (momentumValue) return JSON.parse(momentumValue);
+    
+    return defaultValue;
+  } catch (e) {
+    return defaultValue;
+  }
+};
+
 export const HabitProvider = ({ children }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString());
-
-  const defaultCategories = [
-    { id: '1', name: 'Work', color: 'var(--cat-purple)', icon: 'Briefcase' },
-    { id: '2', name: 'Health', color: 'var(--cat-yellow)', icon: 'Activity' },
-    { id: '3', name: 'Personal', color: 'var(--cat-red)', icon: 'User' },
-    { id: '4', name: 'Study', color: 'var(--cat-pink)', icon: 'Book' },
-  ];
-
-  const getInitialValue = (key, defaultValue) => {
-    try {
-      const newValue = localStorage.getItem(`habbitz_${key}`);
-      if (newValue) return JSON.parse(newValue);
-      
-      const habitzzValue = localStorage.getItem(`habitzz_${key}`);
-      if (habitzzValue) return JSON.parse(habitzzValue);
-      
-      const trackifyValue = localStorage.getItem(`trackify_${key}`);
-      if (trackifyValue) return JSON.parse(trackifyValue);
-      
-      const momentumValue = localStorage.getItem(`momentum_${key}`);
-      if (momentumValue) return JSON.parse(momentumValue);
-      
-      return defaultValue;
-    } catch (e) {
-      return defaultValue;
-    }
-  };
+  const [notificationPermission, setNotificationPermission] = useState('Notification' in window ? Notification.permission : 'unsupported');
 
   const [categories, setCategories] = useState(() => getInitialValue('categories', defaultCategories));
   const [habits, setHabits] = useState(() => getInitialValue('habits', []));
@@ -47,6 +48,85 @@ export const HabitProvider = ({ children }) => {
     return { ...def, ...val };
   });
   const [focusSessions, setFocusSessions] = useState(() => getInitialValue('focus_sessions', []));
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) return 'unsupported';
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+    return permission;
+  };
+
+  // Sync permission state when window is focused
+  useEffect(() => {
+    const syncPermission = () => {
+      if ('Notification' in window) {
+        setNotificationPermission(Notification.permission);
+      }
+    };
+    
+    window.addEventListener('focus', syncPermission);
+    return () => window.removeEventListener('focus', syncPermission);
+  }, []);
+
+  const sendNotification = useCallback(async (title, body, tag) => {
+    console.log(`[Notification Service] Attempting to send: "${title}"`, { permission: Notification.permission, state: notificationPermission });
+    
+    // Play sound fallback if enabled
+    if (userStats.preferences?.sound !== false) {
+      try {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        audio.volume = 0.5;
+        audio.play();
+        console.log("[Notification Service] Audio chime played.");
+      } catch (audioError) {
+        console.warn("[Notification Service] Could not play audio chime", audioError);
+      }
+    }
+
+    if (Notification.permission !== 'granted') {
+      console.warn("[Notification Service] Permission not granted at browser level.");
+      return;
+    }
+    
+    const options = {
+      body,
+      tag: tag || 'habit-reminder',
+      icon: `/pwa-192x192.jpg?v=${Date.now()}`,
+      badge: `/pwa-192x192.jpg?v=${Date.now()}`,
+      vibrate: [100, 50, 100],
+      data: {
+        dateOfArrival: Date.now(),
+        primaryKey: 1
+      },
+      requireInteraction: true // Keeps the notification visible until user interacts
+    };
+    
+    try {
+      // Try using Service Worker registration first (better for PWA)
+      if ('serviceWorker' in navigator) {
+        // Use a timeout promise to avoid hanging forever
+        const swReadyPromise = navigator.serviceWorker.ready;
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SW Timeout')), 2000));
+        
+        try {
+          const registration = await Promise.race([swReadyPromise, timeoutPromise]);
+          if (registration && registration.showNotification) {
+            await registration.showNotification(title, options);
+            console.log("[Notification Service] Sent via Service Worker");
+            return;
+          }
+        } catch (swError) {
+          console.warn("[Notification Service] Service Worker not ready in time, falling back to standard API.", swError);
+        }
+      }
+      
+      // Fallback to standard Notification API
+      new Notification(title, options);
+      console.log("[Notification Service] Sent via standard API");
+    } catch (e) {
+      console.error("[Notification Service] Error sending notification:", e);
+    }
+  }, [notificationPermission]);
 
   useEffect(() => {
     localStorage.setItem('habbitz_categories', JSON.stringify(categories));
@@ -78,6 +158,11 @@ export const HabitProvider = ({ children }) => {
   const addHabit = useCallback((data) => setHabits(prev => [...prev, { id: uuidv4(), createdAt: new Date().toISOString(), status: 'active', streak: 0, ...data }]), []);
   const editHabit = useCallback((id, upd) => setHabits(prev => prev.map(h => h.id === id ? { ...h, ...upd } : h)), []);
   const deleteHabit = useCallback((id) => setHabits(prev => prev.filter(h => h.id !== id)), []);
+  
+  const resetNotificationFlags = useCallback(() => {
+    setHabits(prev => prev.map(h => ({ ...h, lastNotified: undefined, lastNotifiedTs: 0 })));
+    setTasks(prev => prev.map(t => ({ ...t, lastNotified: undefined })));
+  }, []);
   
   const addTask = useCallback((data) => setTasks(prev => [...prev, { id: uuidv4(), createdAt: new Date().toISOString(), completed: false, ...data }]), []);
   const editTask = useCallback((id, upd) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...upd } : t)), []);
@@ -233,11 +318,95 @@ export const HabitProvider = ({ children }) => {
 
   const clearFocusSessions = useCallback(() => setFocusSessions([]), []);
 
+  // background reminder checker
+  useEffect(() => {
+    if (notificationPermission !== 'granted') return;
+
+    const checkReminders = async () => {
+      const now = new Date();
+      const currentDay = now.getDay();
+      const currentTime = format(now, 'HH:mm');
+      const todayStr = format(now, 'yyyy-MM-dd');
+      
+      console.log(`[Reminder Check] Time: ${currentTime}, Habits count: ${habits.length}`);
+
+      // Check Habits
+      for (const habit of habits) {
+        if (habit.status !== 'active') continue;
+        if (!habit.reminderTime) continue;
+        if (!(habit.frequencyDays || [0,1,2,3,4,5,6]).includes(currentDay)) continue;
+        
+        const log = logs.find(l => l.habitId === habit.id && l.date === todayStr);
+        const isDone = log ? (habit.goalType === 'at_most' ? (log.completedAt && log.progress <= habit.target) : log.progress >= habit.target) : false;
+        if (isDone) continue;
+
+        if (habit.reminderType === 'interval') {
+          const intervalMs = (habit.reminderInterval || 60) * 60000;
+          const lastNotifiedTs = habit.lastNotifiedTs || 0;
+          const lastNotifiedDay = habit.lastNotified; 
+          const endTime = habit.reminderEndTime || '23:59';
+          
+          if (currentTime > endTime) continue;
+
+          if (lastNotifiedDay !== todayStr) {
+             if (habit.reminderTime <= currentTime) {
+                console.log(`Triggering Interval START for habit: ${habit.name}`);
+                await sendNotification(`Habit Reminder: ${habit.name}`, `Time for your regular check!`, `habit-${habit.id}`);
+                showXPToast(`Reminder: ${habit.name}`, 0, 'task'); // UI Fallback
+                editHabit(habit.id, { lastNotified: todayStr, lastNotifiedTs: Date.now() });
+             }
+             continue;
+          }
+
+          if (Date.now() - lastNotifiedTs >= intervalMs) {
+             console.log(`Triggering Interval REPEAT for habit: ${habit.name}`);
+             await sendNotification(`Habit Reminder: ${habit.name}`, `It's been ${habit.reminderInterval} mins, time to go again!`, `habit-${habit.id}`);
+             showXPToast(`Reminder: ${habit.name}`, 0, 'task'); // UI Fallback
+             editHabit(habit.id, { lastNotified: todayStr, lastNotifiedTs: Date.now() });
+          }
+        } else {
+          // Fixed time logic
+          if (habit.lastNotified === todayStr) continue;
+          if (habit.reminderTime <= currentTime) {
+            console.log(`Triggering FIXED reminder for habit: ${habit.name}`);
+            await sendNotification(`Habit Reminder: ${habit.name}`, `Time to work on your habit!`, `habit-${habit.id}`);
+            showXPToast(`Reminder: ${habit.name}`, 0, 'task'); // UI Fallback
+            editHabit(habit.id, { lastNotified: todayStr });
+          }
+        }
+      }
+
+      // Check Tasks
+      tasks.forEach(task => {
+        if (task.completed) return;
+        if (!task.reminderTime) return;
+        if (task.lastNotified === todayStr) return;
+
+        // Check if it's for today
+        const taskDate = task.date || task.startDate; // single tasks have date, recurring tasks have startDate
+        if (taskDate && !isSameDay(new Date(taskDate), now) && task.type !== 'recurring_task') return;
+
+        if (task.type === 'recurring_task') {
+           if (!(task.frequencyDays || [0,1,2,3,4,5,6]).includes(currentDay)) return;
+        }
+
+        if (task.reminderTime <= currentTime) {
+          sendNotification(`Task Reminder: ${task.name}`, `Don't forget to complete your task!`, `task-${task.id}`);
+          editTask(task.id, { lastNotified: todayStr });
+        }
+      });
+    };
+
+    const interval = setInterval(checkReminders, 60000); // check every minute
+    checkReminders(); // check immediately on mount/update
+    return () => clearInterval(interval);
+  }, [habits, tasks, logs, notificationPermission, sendNotification, editHabit, editTask]);
+
   const value = useMemo(() => ({
-    categories, habits, tasks, logs, selectedDate, setSelectedDate, userStats, setUserStats, focusSessions,
+    categories, habits, tasks, logs, selectedDate, setSelectedDate, userStats, setUserStats, focusSessions, notificationPermission, requestNotificationPermission, sendNotification, resetNotificationFlags,
     addCategory, editCategory, deleteCategory, addHabit, editHabit, deleteHabit, addTask, editTask, toggleTask, deleteTask, getLogsForDate, logHabitProgress, updatePreferences, resetData, addFocusSession, clearFocusSessions
   }), [
-    categories, habits, tasks, logs, selectedDate, userStats, focusSessions,
+    categories, habits, tasks, logs, selectedDate, userStats, focusSessions, notificationPermission, requestNotificationPermission, sendNotification, resetNotificationFlags,
     addCategory, editCategory, deleteCategory, addHabit, editHabit, deleteHabit, addTask, editTask, toggleTask, deleteTask, getLogsForDate, logHabitProgress, updatePreferences, resetData, addFocusSession, clearFocusSessions
   ]);
 
