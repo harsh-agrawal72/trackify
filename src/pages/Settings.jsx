@@ -4,14 +4,13 @@ import { User, Volume2, ShieldAlert, Check, Download, Palette, Info, Bell } from
 import { motion } from 'framer-motion';
 
 const ACCENT_COLORS = [
-  { name: 'Rose',    value: '#D84B6B' },
+  { name: 'Teal',    value: '#0097a7' },
+  { name: 'Orange',  value: '#f39c12' },
   { name: 'Purple',  value: '#8e44ad' },
+  { name: 'Rose',    value: '#D84B6B' },
   { name: 'Blue',    value: '#3498db' },
-  { name: 'Teal',    value: '#1abc9c' },
-  { name: 'Orange',  value: '#e67e22' },
   { name: 'Coral',   value: '#FF6B6B' },
   { name: 'Lime',    value: '#27ae60' },
-  { name: 'Gold',    value: '#f39c12' },
 ];
 
 const Settings = () => {

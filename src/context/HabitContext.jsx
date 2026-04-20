@@ -7,6 +7,15 @@ const HabitContext = createContext();
 
 export const useHabits = () => useContext(HabitContext);
 
+const ACCENT_COLORS = [
+  { name: 'Teal', color: '#0097a7' },
+  { name: 'Orange', color: '#f39c12' },
+  { name: 'Purple', color: '#8e44ad' },
+  { name: 'Rose', color: '#D84B6B' },
+  { name: 'Blue', color: '#3498db' },
+  { name: 'Green', color: '#2ecc71' }
+];
+
 const defaultCategories = [
   { id: '1', name: 'Work', color: 'var(--cat-purple)', icon: 'Briefcase' },
   { id: '2', name: 'Health', color: 'var(--cat-yellow)', icon: 'Activity' },
@@ -43,7 +52,7 @@ export const HabitProvider = ({ children }) => {
   const [tasks, setTasks] = useState(() => getInitialValue('tasks', []));
   const [logs, setLogs] = useState(() => getInitialValue('logs', []));
   const [userStats, setUserStats] = useState(() => {
-    const def = { xp: 0, level: 1, currentStreak: 0, highestStreak: 0, lastActive: null, moodLogs: {}, hadPerfectDay: false, preferences: { sound: true, name: 'User', accentColor: '#D84B6B', theme: 'dark' } };
+    const def = { xp: 0, level: 1, currentStreak: 0, highestStreak: 0, lastActive: null, moodLogs: {}, hadPerfectDay: false, preferences: { sound: true, name: 'User', accentColor: '#0097a7', theme: 'dark' } };
     const val = getInitialValue('stats', def);
     return { ...def, ...val };
   });
@@ -91,8 +100,8 @@ export const HabitProvider = ({ children }) => {
     const options = {
       body,
       tag: tag || 'habit-reminder',
-      icon: `/pwa-192x192.jpg?v=${Date.now()}`,
-      badge: `/pwa-192x192.jpg?v=${Date.now()}`,
+      icon: `/pwa-192x192.png?v=${Date.now()}`,
+      badge: `/pwa-192x192.png?v=${Date.now()}`,
       vibrate: [100, 50, 100],
       data: {
         dateOfArrival: Date.now(),
