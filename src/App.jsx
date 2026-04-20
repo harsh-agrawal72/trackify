@@ -1,8 +1,8 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+// Optimized App Component
+import React, { useState, useEffect, lazy, Suspense, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
-import Dashboard from './pages/Dashboard';
 import HabitModal from './components/HabitModal';
 import XPToastContainer from './components/XPToast';
 
@@ -18,7 +18,8 @@ const lazyWithRetry = (componentImport) =>
     }
   });
 
-// Lazy load non-essential pages for better initial performance
+// Lazy load all pages for better initial performance
+const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
 const Habits = lazyWithRetry(() => import('./pages/Habits'));
 const Tasks = lazyWithRetry(() => import('./pages/Tasks'));
 const Categories = lazyWithRetry(() => import('./pages/Categories'));
@@ -50,25 +51,25 @@ function App() {
   }, [currentView, isModalOpen]);
 
   // 3. Navigation Wrappers
-  const navigateTo = (view) => {
+  const navigateTo = useCallback((view) => {
     if (view !== currentView) {
       setCurrentView(view);
       setIsModalOpen(false);
       window.history.pushState({ view }, '');
     }
-  };
+  }, [currentView]);
 
-  const openGlobalModal = () => {
+  const openGlobalModal = useCallback(() => {
     setIsModalOpen(true);
     window.history.pushState({ view: currentView, modal: true }, '');
-  };
+  }, [currentView]);
 
-  const closeGlobalModal = () => {
+  const closeGlobalModal = useCallback(() => {
     setIsModalOpen(false);
     if (window.history.state?.modal) {
       window.history.back();
     }
-  };
+  }, []);
 
   const renderView = () => {
     switch (currentView) {
@@ -100,7 +101,7 @@ function App() {
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.15 }}
             style={{ height: '100%' }}
           >
             <Suspense fallback={<LoadingFallback />}>

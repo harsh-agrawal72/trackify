@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
 import { Plus, Flame, Trophy, Target, ChevronLeft, ChevronRight, Check, CalendarDays, Zap, TrendingUp, Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useHabits } from '../context/HabitContext';
+import { useHabitData, useHabitActions } from '../context/HabitContext';
 import { format, subDays, addDays, getDay, isSameDay } from 'date-fns';
 import HabitModal from '../components/HabitModal';
 import HabitItem from '../components/HabitItem';
@@ -20,7 +20,7 @@ const QUOTES = [
 ];
 
 // Animated circular progress ring
-const ProgressRing = ({ value, max, size = 120, strokeWidth = 10, color, children }) => {
+const ProgressRing = memo(({ value, max, size = 120, strokeWidth = 10, color, children }) => {
   const r = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * r;
   const pct = max > 0 ? Math.min(value / max, 1) : 0;
@@ -36,16 +36,19 @@ const ProgressRing = ({ value, max, size = 120, strokeWidth = 10, color, childre
           strokeDasharray={circumference}
           initial={{ strokeDashoffset: circumference }}
           animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 1.2, ease: 'easeOut' }}
+          transition={{ duration: 1, ease: 'easeOut' }}
         />
       </svg>
       {children}
     </div>
   );
-};
+});
+
+ProgressRing.displayName = 'ProgressRing';
 
 const Dashboard = () => {
-  const { habits, tasks, getLogsForDate, userStats, updatePreferences, selectedDate, setSelectedDate, toggleTask, logs } = useHabits();
+  const { habits, tasks, userStats, selectedDate, logs } = useHabitData();
+  const { getLogsForDate, setSelectedDate, toggleTask, updatePreferences } = useHabitActions();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Sync state with browser history for back-button support
@@ -58,41 +61,43 @@ const Dashboard = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [isModalOpen]);
 
-  const currentDate = new Date(selectedDate);
-  const todayStr = format(currentDate, 'EEEE, MMMM do');
-  const logsToday = getLogsForDate(currentDate);
+  const currentDate = useMemo(() => new Date(selectedDate), [selectedDate]);
+  const logsToday = useMemo(() => getLogsForDate(currentDate), [getLogsForDate, currentDate]);
   const currentDayIndex = getDay(currentDate);
 
   // Daily quote — rotates by day of year
-  const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
-  const quote = QUOTES[dayOfYear % QUOTES.length];
+  const quote = useMemo(() => {
+    const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+    return QUOTES[dayOfYear % QUOTES.length];
+  }, []);
 
   // Generate a strip of 7 days around the selected date
-  const dateStrip = Array.from({ length: 7 }).map((_, idx) => {
-    return subDays(currentDate, 3 - idx);
-  });
+  const dateStrip = useMemo(() => {
+    return Array.from({ length: 7 }).map((_, idx) => subDays(currentDate, 3 - idx));
+  }, [currentDate]);
 
-  const activeHabitsForDate = habits.filter(h => h.status === 'active' && (h.frequencyDays?.includes(currentDayIndex) ?? true));
-  const tasksForDate = tasks.filter(t => t.date === format(currentDate, 'yyyy-MM-dd'));
+  const activeHabitsForDate = useMemo(() => habits.filter(h => h.status === 'active' && (h.frequencyDays?.includes(currentDayIndex) ?? true)), [habits, currentDayIndex]);
+  const tasksForDate = useMemo(() => tasks.filter(t => t.date === format(currentDate, 'yyyy-MM-dd')), [tasks, currentDate]);
 
-  const completedCount = activeHabitsForDate.filter(h => {
+  const completedCount = useMemo(() => activeHabitsForDate.filter(h => {
     const log = logsToday.find(l => l.habitId === h.id);
     if (!log) return false;
     const isAtMost = h.goalType === 'at_most';
     const isAtMostBinary = isAtMost && h.targetUnit === 'binary';
     return isAtMost ? (log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= h.target)) : (log.progress >= h.target);
-  }).length;
+  }).length, [activeHabitsForDate, logsToday]);
 
   const totalActive = activeHabitsForDate.length;
   const progressPercent = totalActive > 0 ? (completedCount / totalActive) * 100 : 0;
 
-  const morningHabits = activeHabitsForDate.filter(h => h.timeOfDay === 'Morning');
-  const afternoonHabits = activeHabitsForDate.filter(h => h.timeOfDay === 'Afternoon');
-  const eveningHabits = activeHabitsForDate.filter(h => h.timeOfDay === 'Evening');
-  const anytimeHabits = activeHabitsForDate.filter(h => !['Morning','Afternoon','Evening'].includes(h.timeOfDay));
+  const morningHabits = useMemo(() => activeHabitsForDate.filter(h => h.timeOfDay === 'Morning'), [activeHabitsForDate]);
+  const afternoonHabits = useMemo(() => activeHabitsForDate.filter(h => h.timeOfDay === 'Afternoon'), [activeHabitsForDate]);
+  const eveningHabits = useMemo(() => activeHabitsForDate.filter(h => h.timeOfDay === 'Evening'), [activeHabitsForDate]);
+  const anytimeHabits = useMemo(() => activeHabitsForDate.filter(h => !['Morning','Afternoon','Evening'].includes(h.timeOfDay)), [activeHabitsForDate]);
 
-  const renderCategorizedList = (title, list) => {
+  const renderCategorizedList = useCallback((title, list) => {
     if (list.length === 0) return null;
+    const dateStr = format(currentDate, 'yyyy-MM-dd');
     return (
       <div style={{ marginBottom: '32px' }}>
         <h3 style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '700' }}>
@@ -102,13 +107,13 @@ const Dashboard = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <AnimatePresence>
             {list.map(habit => (
-              <HabitItem key={habit.id} habit={habit} logs={logsToday} dateStr={format(currentDate, 'yyyy-MM-dd')} />
+              <HabitItem key={habit.id} habit={habit} logs={logsToday} dateStr={dateStr} />
             ))}
           </AnimatePresence>
         </div>
       </div>
     );
-  };
+  }, [currentDate, logsToday]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -117,18 +122,16 @@ const Dashboard = () => {
     return 'Good evening';
   };
 
-  const highPriorityTasks = tasksForDate.filter(t => !t.completed && t.priority === 'High').length;
+  const highPriorityTasks = useMemo(() => tasksForDate.filter(t => !t.completed && t.priority === 'High').length, [tasksForDate]);
 
-  const generateInsight = () => {
+  const insight = useMemo(() => {
     if (completedCount === totalActive && totalActive > 0) return `Amazing! You've crushed all ${totalActive} habits today. 🎯`;
     if (highPriorityTasks > 0) return `${highPriorityTasks} high-priority tasks need attention today.`;
     if (userStats.currentStreak >= 3) return `🔥 ${userStats.currentStreak}-day streak! Keep it up!`;
     if (progressPercent > 0 && progressPercent < 50) return `You're ${Math.round(progressPercent)}% through today. Keep pushing!`;
     if (totalActive - completedCount > 0) return `${totalActive - completedCount} habits left for today. You've got this!`;
     return "Let's make today a productive day. 💪";
-  };
-
-  const xpToNextLevel = ((userStats.level || 1) * 1000) - (userStats.xp || 0);
+  }, [completedCount, totalActive, highPriorityTasks, userStats.currentStreak, progressPercent]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -146,26 +149,19 @@ const Dashboard = () => {
           }}>
             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-primary)', marginTop: '5px', flexShrink: 0 }} />
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', lineHeight: 1.4, wordBreak: 'break-word' }}>
-              <strong style={{ color: 'var(--text-primary)' }}>Tip:</strong> {generateInsight()}
+              <strong style={{ color: 'var(--text-primary)' }}>Tip:</strong> {insight}
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexShrink: 0, position: 'relative' }}>
-          <input 
-            type="date" 
-            id="hidden-date-picker"
-            value={format(currentDate, 'yyyy-MM-dd')}
-            onChange={(e) => {
-              if (e.target.value) setSelectedDate(new Date(e.target.value).toISOString());
-            }}
-            style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
-          />
+        <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexShrink: 0 }}>
           <button 
             className="btn btn-secondary" 
             onClick={() => {
-              const picker = document.getElementById('hidden-date-picker');
-              if (picker.showPicker) picker.showPicker();
-              else picker.click();
+              const input = document.createElement('input');
+              input.type = 'date';
+              input.value = format(currentDate, 'yyyy-MM-dd');
+              input.onchange = (e) => setSelectedDate(new Date(e.target.value).toISOString());
+              input.click();
             }} 
             title="Select Date" 
             style={{ width: '40px', height: '40px', padding: '0', borderRadius: '10px' }}
@@ -216,14 +212,9 @@ const Dashboard = () => {
           {dateStrip.map((d, i) => {
             const isSelected = isSameDay(d, currentDate);
             const isToday = isSameDay(d, new Date());
-            const dayLogs = logs.filter(l => l.date === format(d, 'yyyy-MM-dd'));
-            const hasActivity = dayLogs.some(l => {
-              const h = habits.find(hb => hb.id === l.habitId);
-              if (!h) return false;
-              const isAtMost = h.goalType === 'at_most';
-              const isAtMostBinary = isAtMost && h.targetUnit === 'binary';
-              return isAtMost ? (l.completedAt && (isAtMostBinary ? l.progress === 0 : l.progress <= h.target)) : (l.progress >= h.target);
-            });
+            const dayStr = format(d, 'yyyy-MM-dd');
+            const hasActivity = logs.some(l => l.date === dayStr && !!l.completedAt);
+            
             return (
               <button
                 key={i}
@@ -252,9 +243,9 @@ const Dashboard = () => {
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
         {/* Habits Ring */}
         <div className="glass-panel" style={{ padding: '16px 12px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <ProgressRing value={completedCount} max={totalActive || 1} size={window.innerWidth < 450 ? 80 : 100} strokeWidth={8} color="var(--accent-primary)">
+          <ProgressRing value={completedCount} max={totalActive || 1} size={90} strokeWidth={8} color="var(--accent-primary)">
             <div style={{ textAlign: 'center', zIndex: 1 }}>
-              <div style={{ fontSize: window.innerWidth < 450 ? '16px' : '22px', fontWeight: '800', lineHeight: 1 }}>{completedCount}</div>
+              <div style={{ fontSize: '20px', fontWeight: '800', lineHeight: 1 }}>{completedCount}</div>
               <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>/{totalActive}</div>
             </div>
           </ProgressRing>
@@ -266,9 +257,9 @@ const Dashboard = () => {
 
         {/* Streak Ring */}
         <div className="glass-panel" style={{ padding: '16px 12px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <ProgressRing value={userStats.currentStreak || 0} max={Math.max(userStats.highestStreak || 7, 7)} size={window.innerWidth < 450 ? 80 : 100} strokeWidth={8} color="var(--accent-warning)">
+          <ProgressRing value={userStats.currentStreak || 0} max={Math.max(userStats.highestStreak || 7, 7)} size={90} strokeWidth={8} color="var(--accent-warning)">
             <div style={{ textAlign: 'center', zIndex: 1 }}>
-              <Flame size={window.innerWidth < 450 ? 18 : 22} color="var(--accent-warning)" />
+              <Flame size={20} color="var(--accent-warning)" />
             </div>
           </ProgressRing>
           <div style={{ minWidth: '100px', flex: 1 }}>
@@ -282,9 +273,9 @@ const Dashboard = () => {
 
         {/* XP Ring */}
         <div className="glass-panel" style={{ padding: '16px 12px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <ProgressRing value={(userStats.xp || 0) % 1000} max={1000} size={window.innerWidth < 450 ? 80 : 100} strokeWidth={8} color="#8e44ad">
+          <ProgressRing value={(userStats.xp || 0) % 1000} max={1000} size={90} strokeWidth={8} color="#8e44ad">
             <div style={{ textAlign: 'center', zIndex: 1 }}>
-              <Zap size={window.innerWidth < 450 ? 18 : 22} color="#8e44ad" />
+              <Zap size={20} color="#8e44ad" />
             </div>
           </ProgressRing>
           <div style={{ minWidth: '100px', flex: 1 }}>
@@ -298,9 +289,9 @@ const Dashboard = () => {
       {/* Achievements Panel */}
       <AchievementsPanel userStats={userStats} logs={logs} habits={habits} />
 
-      <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 900 ? '1fr' : '1fr 360px', gap: '24px' }}>
+      <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
 
-        {/* Left Column: Habits */}
+        {/* Habits Column */}
         <div>
           <div className="glass-panel" style={{ padding: '20px', marginBottom: '28px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -328,22 +319,9 @@ const Dashboard = () => {
                 textAlign: 'center', padding: '48px 24px', border: '2px dashed var(--stroke-subtle)', borderRadius: '24px',
                 background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px'
               }}>
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
-                  <Zap size={32} color="var(--accent-primary)" />
-                </div>
-                <h3 style={{ fontSize: '18px', fontWeight: '800' }}>
-                  {habits.length === 0 ? "Your habbitz journey starts here!" : `No habits scheduled for ${format(currentDate, 'EEE')}`}
-                </h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '14px', maxWidth: '280px', margin: '0 auto', lineHeight: 1.5 }}>
-                  {habits.length === 0 
-                    ? "Start by adding your first habit to build your daily routine." 
-                    : "Take a breather or add a one-time activity for today."}
-                </p>
-                {habits.length === 0 && (
-                  <button className="btn btn-primary" onClick={() => setIsModalOpen(true)} style={{ marginTop: '8px' }}>
-                    <Plus size={18} /> Create First Habit
-                  </button>
-                )}
+                <Zap size={32} color="var(--accent-primary)" />
+                <h3 style={{ fontSize: '18px', fontWeight: '800' }}>No habits scheduled for today</h3>
+                <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>Create Habit</button>
               </div>
             ) : (
               <>
@@ -356,13 +334,9 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Right Column */}
+        {/* Right Column: Mood & Tasks */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-          {/* Mood Tracker */}
           <MoodTracker />
-
-          {/* To-Do List */}
           <div>
             <h2 style={{ fontSize: '22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               To-Do List
@@ -372,36 +346,23 @@ const Dashboard = () => {
             </h2>
             <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {tasksForDate.length === 0 ? (
-                <div style={{ 
-                  textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)',
-                  border: '1px solid var(--stroke-subtle)', borderRadius: '16px', background: 'rgba(255,255,255,0.01)'
-                }}>
-                  <div style={{ fontSize: '24px', marginBottom: '8px' }}>✨</div>
-                  <div style={{ fontSize: '14px', fontWeight: '600' }}>Clear sky for today</div>
-                  <div style={{ fontSize: '12px', opacity: 0.6 }}>No tasks on your plate.</div>
-                </div>
+                <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>No tasks for today.</div>
               ) : (
                 tasksForDate.map(task => (
                   <motion.div
                     key={task.id}
                     layout
-                    whileHover={{ x: 4 }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: task.completed ? 'transparent' : 'var(--bg-elevated)', borderRadius: '12px', border: `1px solid ${task.completed ? 'transparent' : 'var(--stroke-subtle)'}`, transition: 'all 0.2s' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: task.completed ? 'transparent' : 'var(--bg-elevated)', borderRadius: '12px', border: `1px solid ${task.completed ? 'transparent' : 'var(--stroke-subtle)'}` }}
                   >
                     <button
                       onClick={() => toggleTask(task.id)}
-                      style={{ width: '24px', height: '24px', borderRadius: '8px', border: task.completed ? 'none' : '2px solid var(--stroke-strong)', background: task.completed ? 'var(--accent-success)' : 'transparent', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                      style={{ width: '24px', height: '24px', borderRadius: '8px', border: task.completed ? 'none' : '2px solid var(--stroke-strong)', background: task.completed ? 'var(--accent-success)' : 'transparent', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                     >
                       {task.completed && <Check size={14} />}
                     </button>
-                    <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: '14px', color: task.completed ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: task.completed ? 'line-through' : 'none' }}>
-                        {task.name}
-                      </span>
-                      {task.priority === 'High' && !task.completed && (
-                        <span style={{ marginLeft: '8px', fontSize: '11px', background: 'rgba(231,76,60,0.2)', color: '#e74c3c', padding: '2px 8px', borderRadius: '99px', fontWeight: '600' }}>HIGH</span>
-                      )}
-                    </div>
+                    <span style={{ fontSize: '14px', color: task.completed ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: task.completed ? 'line-through' : 'none' }}>
+                      {task.name}
+                    </span>
                   </motion.div>
                 ))
               )}
@@ -417,3 +378,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

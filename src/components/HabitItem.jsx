@@ -1,10 +1,10 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Flame, Plus, Minus, AlertTriangle, Clock } from 'lucide-react';
-import { useHabits } from '../context/HabitContext';
+import { useHabitActions } from '../context/HabitContext';
 
 const HabitItem = memo(({ habit, logs }) => {
-  const { logHabitProgress } = useHabits();
+  const { logHabitProgress } = useHabitActions();
   
   const currentLog = logs.find(l => l.habitId === habit.id);
   const progress = currentLog ? currentLog.progress : 0;
@@ -14,11 +14,10 @@ const HabitItem = memo(({ habit, logs }) => {
     ? (progress >= habit.target) 
     : (!!currentLog?.completedAt && (isAtMostBinary ? progress === 0 : progress <= habit.target)); 
   const isFailed = !isAtLeast && (isAtMostBinary ? progress > 0 : progress > habit.target);
-  const isSucceeding = !isAtLeast && !isFailed;
   
   const progressPercent = Math.min((progress / habit.target) * 100, 100);
   
-  const getStepSize = (unit) => {
+  const getStepSize = useCallback((unit) => {
     switch(unit) {
       case 'steps': return 1000;
       case 'km': return 1;
@@ -26,9 +25,10 @@ const HabitItem = memo(({ habit, logs }) => {
       case 'pages': return 5;
       default: return 1;
     }
-  };
+  }, []);
 
-  const handleStep = () => {
+  const handleStep = useCallback((e) => {
+    e?.stopPropagation();
     const stepSize = getStepSize(habit.targetUnit);
     if (habit.targetUnit === 'binary' && !isAtLeast) {
       if (isCompleted) {
@@ -41,20 +41,20 @@ const HabitItem = memo(({ habit, logs }) => {
       const amount = habit.targetUnit === 'mins' ? habit.target : stepSize;
       logHabitProgress(habit.id, amount);
     }
-  };
+  }, [habit.id, habit.targetUnit, isAtLeast, isCompleted, progress, logHabitProgress, getStepSize]);
 
-  const handleToggleSuccess = (e) => {
+  const handleToggleSuccess = useCallback((e) => {
     e.stopPropagation();
     logHabitProgress(habit.id, 0);
-  };
+  }, [habit.id, logHabitProgress]);
 
-  const handleDecrement = (e) => {
+  const handleDecrement = useCallback((e) => {
     e.stopPropagation();
     if (progress > 0) {
       const stepSize = getStepSize(habit.targetUnit);
       logHabitProgress(habit.id, -stepSize);
     }
-  };
+  }, [habit.id, progress, logHabitProgress, getStepSize]);
 
   return (
     <motion.div 
@@ -86,7 +86,7 @@ const HabitItem = memo(({ habit, logs }) => {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', zIndex: 1 }}>
         <button 
-          onClick={(e) => { e.stopPropagation(); isAtLeast ? handleStep() : handleToggleSuccess(e); }}
+          onClick={(e) => { e.stopPropagation(); isAtLeast ? handleStep(e) : handleToggleSuccess(e); }}
           style={{
             width: '44px', height: '44px', borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             border: (isCompleted || isFailed) ? 'none' : '2px solid var(--stroke-strong)', 
@@ -94,7 +94,6 @@ const HabitItem = memo(({ habit, logs }) => {
             cursor: 'pointer', transition: 'all 0.2s', color: (isCompleted || isFailed) ? '#000' : 'var(--text-primary)',
             position: 'relative'
           }}
-          whileTap={{ scale: 0.9 }}
         >
           {isCompleted ? <Check size={20} /> : (
             (isFailed && habit.targetUnit === 'binary') ? <AlertTriangle size={20} /> : (
@@ -218,4 +217,7 @@ const HabitItem = memo(({ habit, logs }) => {
   );
 });
 
+HabitItem.displayName = 'HabitItem';
+
 export default HabitItem;
+

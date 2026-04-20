@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { AlignLeft, Star, CheckSquare, Grid, Timer, Activity, Zap, Plus } from 'lucide-react';
-import { useHabits } from '../context/HabitContext';
+import { useHabitData, useHabitActions } from '../context/HabitContext';
 
-const Sidebar = ({ currentView, setCurrentView, openModal }) => {
-  const { userStats } = useHabits();
+const Sidebar = memo(({ currentView, setCurrentView, openModal }) => {
+  const { userStats } = useHabitData();
 
   const tabs = [
     { id: 'today', label: 'Today', icon: AlignLeft },
@@ -79,6 +79,9 @@ const Sidebar = ({ currentView, setCurrentView, openModal }) => {
 
     </aside>
   );
-};
+});
+
+Sidebar.displayName = 'Sidebar';
 
 export default Sidebar;
+

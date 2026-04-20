@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { LayoutDashboard, Star, CheckSquare, BarChart3, Timer, Settings, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-const BottomNav = ({ activeTab, setActiveTab, onPlusClick, isModalOpen }) => {
+const BottomNav = memo(({ activeTab, setActiveTab, onPlusClick, isModalOpen }) => {
   const tabs = [
     { id: 'today', label: 'Today', icon: LayoutDashboard },
     { id: 'habits', label: 'Habits', icon: Star },
@@ -42,6 +42,9 @@ const BottomNav = ({ activeTab, setActiveTab, onPlusClick, isModalOpen }) => {
       </nav>
     </>
   );
-};
+});
+
+BottomNav.displayName = 'BottomNav';
 
 export default BottomNav;
+

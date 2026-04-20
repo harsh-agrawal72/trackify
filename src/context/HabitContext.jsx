@@ -3,9 +3,21 @@ import { v4 as uuidv4 } from 'uuid';
 import { format, isSameDay, subDays } from 'date-fns';
 import { showXPToast } from '../components/XPToast';
 
-const HabitContext = createContext();
+const HabitDataContext = createContext();
+const HabitActionsContext = createContext();
 
-export const useHabits = () => useContext(HabitContext);
+export const useHabits = () => {
+  const data = useContext(HabitDataContext);
+  const actions = useContext(HabitActionsContext);
+  if (!data || !actions) {
+    throw new Error('useHabits must be used within a HabitProvider');
+  }
+  return { ...data, ...actions };
+};
+
+// More granular hooks for better performance
+export const useHabitData = () => useContext(HabitDataContext);
+export const useHabitActions = () => useContext(HabitActionsContext);
 
 const ACCENT_COLORS = [
   { name: 'Teal', color: '#0097a7' },
@@ -25,18 +37,11 @@ const defaultCategories = [
 
 const getInitialValue = (key, defaultValue) => {
   try {
-    const newValue = localStorage.getItem(`habbitz_${key}`);
-    if (newValue) return JSON.parse(newValue);
-    
-    const habitzzValue = localStorage.getItem(`habitzz_${key}`);
-    if (habitzzValue) return JSON.parse(habitzzValue);
-    
-    const trackifyValue = localStorage.getItem(`trackify_${key}`);
-    if (trackifyValue) return JSON.parse(trackifyValue);
-    
-    const momentumValue = localStorage.getItem(`momentum_${key}`);
-    if (momentumValue) return JSON.parse(momentumValue);
-    
+    const keys = ['habbitz_', 'habitzz_', 'trackify_', 'momentum_'];
+    for (const prefix of keys) {
+      const val = localStorage.getItem(`${prefix}${key}`);
+      if (val) return JSON.parse(val);
+    }
     return defaultValue;
   } catch (e) {
     return defaultValue;
@@ -44,7 +49,7 @@ const getInitialValue = (key, defaultValue) => {
 };
 
 export const HabitProvider = ({ children }) => {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString());
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString());
   const [notificationPermission, setNotificationPermission] = useState('Notification' in window ? Notification.permission : 'unsupported');
 
   const [categories, setCategories] = useState(() => getInitialValue('categories', defaultCategories));
@@ -58,12 +63,12 @@ export const HabitProvider = ({ children }) => {
   });
   const [focusSessions, setFocusSessions] = useState(() => getInitialValue('focus_sessions', []));
 
-  const requestNotificationPermission = async () => {
+  const requestNotificationPermission = useCallback(async () => {
     if (!('Notification' in window)) return 'unsupported';
     const permission = await Notification.requestPermission();
     setNotificationPermission(permission);
     return permission;
-  };
+  }, []);
 
   // Sync permission state when window is focused
   useEffect(() => {
@@ -78,24 +83,17 @@ export const HabitProvider = ({ children }) => {
   }, []);
 
   const sendNotification = useCallback(async (title, body, tag) => {
-    console.log(`[Notification Service] Attempting to send: "${title}"`, { permission: Notification.permission, state: notificationPermission });
-    
-    // Play sound fallback if enabled
     if (userStats.preferences?.sound !== false) {
       try {
         const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
         audio.volume = 0.5;
         audio.play();
-        console.log("[Notification Service] Audio chime played.");
       } catch (audioError) {
         console.warn("[Notification Service] Could not play audio chime", audioError);
       }
     }
 
-    if (Notification.permission !== 'granted') {
-      console.warn("[Notification Service] Permission not granted at browser level.");
-      return;
-    }
+    if (Notification.permission !== 'granted') return;
     
     const options = {
       body,
@@ -103,61 +101,42 @@ export const HabitProvider = ({ children }) => {
       icon: `/pwa-192x192.png?v=${Date.now()}`,
       badge: `/pwa-192x192.png?v=${Date.now()}`,
       vibrate: [100, 50, 100],
-      data: {
-        dateOfArrival: Date.now(),
-        primaryKey: 1
-      },
-      requireInteraction: true // Keeps the notification visible until user interacts
+      requireInteraction: true
     };
     
     try {
-      // Try using Service Worker registration first (better for PWA)
       if ('serviceWorker' in navigator) {
-        // Use a timeout promise to avoid hanging forever
-        const swReadyPromise = navigator.serviceWorker.ready;
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SW Timeout')), 2000));
-        
-        try {
-          const registration = await Promise.race([swReadyPromise, timeoutPromise]);
-          if (registration && registration.showNotification) {
-            await registration.showNotification(title, options);
-            console.log("[Notification Service] Sent via Service Worker");
-            return;
-          }
-        } catch (swError) {
-          console.warn("[Notification Service] Service Worker not ready in time, falling back to standard API.", swError);
+        const registration = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('SW Timeout')), 2000))
+        ]);
+        if (registration && registration.showNotification) {
+          await registration.showNotification(title, options);
+          return;
         }
       }
-      
-      // Fallback to standard Notification API
       new Notification(title, options);
-      console.log("[Notification Service] Sent via standard API");
     } catch (e) {
       console.error("[Notification Service] Error sending notification:", e);
     }
-  }, [notificationPermission]);
+  }, [userStats.preferences?.sound]);
 
+  // Bulk sync to localStorage (debounced or optimized)
   useEffect(() => {
-    localStorage.setItem('habbitz_categories', JSON.stringify(categories));
-    localStorage.setItem('habbitz_habits', JSON.stringify(habits));
-    localStorage.setItem('habbitz_tasks', JSON.stringify(tasks));
-    localStorage.setItem('habbitz_logs', JSON.stringify(logs));
-    localStorage.setItem('habbitz_stats', JSON.stringify(userStats));
-    localStorage.setItem('habbitz_focus_sessions', JSON.stringify(focusSessions));
+    const data = { categories, habits, tasks, logs, stats: userStats, focus_sessions: focusSessions };
+    Object.entries(data).forEach(([key, val]) => {
+      localStorage.setItem(`habbitz_${key}`, JSON.stringify(val));
+    });
   }, [categories, habits, tasks, logs, userStats, focusSessions]);
 
   useEffect(() => {
-    const accent = userStats?.preferences?.accentColor || '#D84B6B';
+    const accent = userStats?.preferences?.accentColor || '#0097a7';
     document.documentElement.style.setProperty('--accent-primary', accent);
   }, [userStats?.preferences?.accentColor]);
   
   useEffect(() => {
     const theme = userStats.preferences?.theme || 'dark';
-    if (theme === 'light') {
-      document.documentElement.classList.add('light-mode');
-    } else {
-      document.documentElement.classList.remove('light-mode');
-    }
+    document.documentElement.classList.toggle('light-mode', theme === 'light');
   }, [userStats.preferences?.theme]);
 
   const addFocusSession = useCallback((session) => {
@@ -327,7 +306,7 @@ export const HabitProvider = ({ children }) => {
 
   const clearFocusSessions = useCallback(() => setFocusSessions([]), []);
 
-  // background reminder checker
+  // Background reminder checker
   useEffect(() => {
     if (notificationPermission !== 'granted') return;
 
@@ -337,9 +316,6 @@ export const HabitProvider = ({ children }) => {
       const currentTime = format(now, 'HH:mm');
       const todayStr = format(now, 'yyyy-MM-dd');
       
-      console.log(`[Reminder Check] Time: ${currentTime}, Habits count: ${habits.length}`);
-
-      // Check Habits
       for (const habit of habits) {
         if (habit.status !== 'active') continue;
         if (!habit.reminderTime) continue;
@@ -359,45 +335,33 @@ export const HabitProvider = ({ children }) => {
 
           if (lastNotifiedDay !== todayStr) {
              if (habit.reminderTime <= currentTime) {
-                console.log(`Triggering Interval START for habit: ${habit.name}`);
                 await sendNotification(`Habit Reminder: ${habit.name}`, `Time for your regular check!`, `habit-${habit.id}`);
-                showXPToast(`Reminder: ${habit.name}`, 0, 'task'); // UI Fallback
+                showXPToast(`Reminder: ${habit.name}`, 0, 'task');
                 editHabit(habit.id, { lastNotified: todayStr, lastNotifiedTs: Date.now() });
              }
              continue;
           }
 
           if (Date.now() - lastNotifiedTs >= intervalMs) {
-             console.log(`Triggering Interval REPEAT for habit: ${habit.name}`);
              await sendNotification(`Habit Reminder: ${habit.name}`, `It's been ${habit.reminderInterval} mins, time to go again!`, `habit-${habit.id}`);
-             showXPToast(`Reminder: ${habit.name}`, 0, 'task'); // UI Fallback
+             showXPToast(`Reminder: ${habit.name}`, 0, 'task');
              editHabit(habit.id, { lastNotified: todayStr, lastNotifiedTs: Date.now() });
           }
         } else {
-          // Fixed time logic
           if (habit.lastNotified === todayStr) continue;
           if (habit.reminderTime <= currentTime) {
-            console.log(`Triggering FIXED reminder for habit: ${habit.name}`);
             await sendNotification(`Habit Reminder: ${habit.name}`, `Time to work on your habit!`, `habit-${habit.id}`);
-            showXPToast(`Reminder: ${habit.name}`, 0, 'task'); // UI Fallback
+            showXPToast(`Reminder: ${habit.name}`, 0, 'task');
             editHabit(habit.id, { lastNotified: todayStr });
           }
         }
       }
 
-      // Check Tasks
       tasks.forEach(task => {
-        if (task.completed) return;
-        if (!task.reminderTime) return;
-        if (task.lastNotified === todayStr) return;
-
-        // Check if it's for today
-        const taskDate = task.date || task.startDate; // single tasks have date, recurring tasks have startDate
+        if (task.completed || !task.reminderTime || task.lastNotified === todayStr) return;
+        const taskDate = task.date || task.startDate;
         if (taskDate && !isSameDay(new Date(taskDate), now) && task.type !== 'recurring_task') return;
-
-        if (task.type === 'recurring_task') {
-           if (!(task.frequencyDays || [0,1,2,3,4,5,6]).includes(currentDay)) return;
-        }
+        if (task.type === 'recurring_task' && !(task.frequencyDays || [0,1,2,3,4,5,6]).includes(currentDay)) return;
 
         if (task.reminderTime <= currentTime) {
           sendNotification(`Task Reminder: ${task.name}`, `Don't forget to complete your task!`, `task-${task.id}`);
@@ -406,22 +370,29 @@ export const HabitProvider = ({ children }) => {
       });
     };
 
-    const interval = setInterval(checkReminders, 60000); // check every minute
-    checkReminders(); // check immediately on mount/update
+    const interval = setInterval(checkReminders, 60000);
+    checkReminders();
     return () => clearInterval(interval);
   }, [habits, tasks, logs, notificationPermission, sendNotification, editHabit, editTask]);
 
-  const value = useMemo(() => ({
-    categories, habits, tasks, logs, selectedDate, setSelectedDate, userStats, setUserStats, focusSessions, notificationPermission, requestNotificationPermission, sendNotification, resetNotificationFlags,
+  const dataValue = useMemo(() => ({
+    categories, habits, tasks, logs, selectedDate, userStats, focusSessions, notificationPermission
+  }), [categories, habits, tasks, logs, selectedDate, userStats, focusSessions, notificationPermission]);
+
+  const actionsValue = useMemo(() => ({
+    setSelectedDate, requestNotificationPermission, sendNotification, resetNotificationFlags,
     addCategory, editCategory, deleteCategory, addHabit, editHabit, deleteHabit, addTask, editTask, toggleTask, deleteTask, getLogsForDate, logHabitProgress, updatePreferences, resetData, addFocusSession, clearFocusSessions
   }), [
-    categories, habits, tasks, logs, selectedDate, userStats, focusSessions, notificationPermission, requestNotificationPermission, sendNotification, resetNotificationFlags,
+    setSelectedDate, requestNotificationPermission, sendNotification, resetNotificationFlags,
     addCategory, editCategory, deleteCategory, addHabit, editHabit, deleteHabit, addTask, editTask, toggleTask, deleteTask, getLogsForDate, logHabitProgress, updatePreferences, resetData, addFocusSession, clearFocusSessions
   ]);
 
   return (
-    <HabitContext.Provider value={value}>
-      {children}
-    </HabitContext.Provider>
+    <HabitDataContext.Provider value={dataValue}>
+      <HabitActionsContext.Provider value={actionsValue}>
+        {children}
+      </HabitActionsContext.Provider>
+    </HabitDataContext.Provider>
   );
 };
+
