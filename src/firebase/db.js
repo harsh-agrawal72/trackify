@@ -64,6 +64,17 @@ export const saveStats = async (uid, stats) => {
 };
 
 // ──────────────────────────────────────────────────────────
+// Save Web Push Subscription
+// ──────────────────────────────────────────────────────────
+export const savePushSubscription = async (uid, subscription) => {
+  const ref = doc(db, 'users', uid, 'push', 'subscription');
+  await setDoc(ref, {
+    ...JSON.parse(JSON.stringify(subscription)),
+    _updatedAt: serverTimestamp(),
+  });
+};
+
+// ──────────────────────────────────────────────────────────
 // Batch write an entire array to a collection (used for migration)
 // ──────────────────────────────────────────────────────────
 const batchWriteCollection = async (uid, colName, items) => {

@@ -156,13 +156,24 @@ const Settings = () => {
               <div style={{ fontWeight: '600', marginBottom: '4px' }}>System Permission</div>
               <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Status: <span style={{ color: notificationPermission === 'granted' ? 'var(--accent-success)' : 'var(--accent-danger)', fontWeight: 'bold' }}>{notificationPermission.toUpperCase()}</span></div>
             </div>
-            {notificationPermission !== 'granted' && (
+            {notificationPermission !== 'granted' ? (
               <button
                 onClick={requestNotificationPermission}
                 className="btn btn-primary"
                 style={{ padding: '8px 16px', fontSize: '13px' }}
               >
                 Enable
+              </button>
+            ) : (
+              <button
+                onClick={async () => {
+                  await requestNotificationPermission();
+                  alert("Push subscription re-synced with the server!");
+                }}
+                className="btn btn-secondary"
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+              >
+                Re-Sync Push
               </button>
             )}
           </div>
