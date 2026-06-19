@@ -129,7 +129,7 @@ export const HabitProvider = ({ children }) => {
     
     if (permission === 'granted' && uid && 'serviceWorker' in navigator) {
       try {
-        const registration = await navigator.serviceWorker.register('/sw.js');
+        const registration = await navigator.serviceWorker.register('/push-sw.js');
         let subscription = await registration.pushManager.getSubscription();
         
         if (subscription) {

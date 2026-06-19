@@ -44,6 +44,37 @@ app.get('/', (req, res) => {
   res.send('Habit Tracker Push Notification Server is running!');
 });
 
+// Debug endpoint: see what Firestore actually contains
+app.get('/debug', async (req, res) => {
+  if (!db) return res.json({ error: "DB not initialized" });
+  try {
+    const usersSnap = await db.collection('users').get();
+    const result = {};
+    for (const userDoc of usersSnap.docs) {
+      const uid = userDoc.id;
+      result[uid] = { habits: [], pushSubscription: false };
+      
+      const habitsSnap = await db.collection('users').doc(uid).collection('habits').get();
+      for (const h of habitsSnap.docs) {
+        const data = h.data();
+        result[uid].habits.push({ 
+          id: h.id, 
+          name: data.name, 
+          reminderTime: data.reminderTime,
+          reminder: data.reminder,
+          status: data.status
+        });
+      }
+      
+      const subDoc = await db.collection('users').doc(uid).collection('push').doc('subscription').get();
+      result[uid].pushSubscription = subDoc.exists;
+    }
+    res.json(result);
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
 // Endpoint to test push notifications manually
 app.post('/test-push', async (req, res) => {
   const { subscription, payload } = req.body;
