@@ -16,7 +16,7 @@ const Sidebar = memo(({ currentView, setCurrentView, openModal }) => {
 
   return (
     <aside className="sidebar">
-      
+
       {/* Brand */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '48px' }}>
         <div style={{ background: 'var(--accent-primary)', padding: '8px', borderRadius: '12px', boxShadow: '0 4px 12px var(--accent-primary-dim)' }}>
@@ -38,7 +38,7 @@ const Sidebar = memo(({ currentView, setCurrentView, openModal }) => {
           const Icon = tab.icon;
           const isActive = currentView === tab.id;
           return (
-            <button 
+            <button
               key={tab.id}
               className={`sidebar-link ${isActive ? 'active' : ''}`}
               onClick={() => setCurrentView(tab.id)}
@@ -58,9 +58,9 @@ const Sidebar = memo(({ currentView, setCurrentView, openModal }) => {
             <span style={{ fontWeight: 'bold', color: 'var(--cat-yellow)' }}>Lv. {userStats.level}</span>
           </div>
           <div style={{ height: '6px', background: 'var(--bg-base)', borderRadius: '99px', overflow: 'hidden' }}>
-            <div style={{ 
-              height: '100%', 
-              width: `${(userStats.xp % 1000) / 10}%`, 
+            <div style={{
+              height: '100%',
+              width: `${(userStats.xp % 1000) / 10}%`,
               background: 'linear-gradient(90deg, var(--cat-yellow), var(--accent-primary))',
               borderRadius: '99px',
               transition: 'width 0.5s ease'
@@ -68,7 +68,7 @@ const Sidebar = memo(({ currentView, setCurrentView, openModal }) => {
           </div>
         </div>
 
-        <button 
+        <button
           className={`sidebar-link ${currentView === 'settings' ? 'active' : ''}`}
           onClick={() => setCurrentView('settings')}
         >

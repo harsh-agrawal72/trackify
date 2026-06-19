@@ -1,7 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { format, isSameDay, subDays } from 'date-fns';
 import { showXPToast } from '../components/XPToast';
+import { useAuth } from '../components/AuthGuard';
+import { loadUserData, saveItem, deleteItem, saveStats, migrateFromLocalStorage } from '../firebase/db';
+import { signOut } from '../firebase/auth';
 
 const HabitDataContext = createContext();
 const HabitActionsContext = createContext();
@@ -49,6 +52,10 @@ const getInitialValue = (key, defaultValue) => {
 };
 
 export const HabitProvider = ({ children }) => {
+  const user = useAuth(); // Firebase user
+  const uid = user?.uid;
+  const [firestoreReady, setFirestoreReady] = useState(false);
+
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString());
   const [notificationPermission, setNotificationPermission] = useState('Notification' in window ? Notification.permission : 'unsupported');
 
@@ -62,6 +69,47 @@ export const HabitProvider = ({ children }) => {
     return { ...def, ...val };
   });
   const [focusSessions, setFocusSessions] = useState(() => getInitialValue('focus_sessions', []));
+
+  // ── Load from Firestore on login ──────────────────────────
+  useEffect(() => {
+    if (!uid) return;
+    const init = async () => {
+      try {
+        // Migrate localStorage to Firestore on first login
+        const migrated = localStorage.getItem('habbitz_migrated');
+        if (!migrated || migrated !== uid) {
+          await migrateFromLocalStorage(uid);
+        }
+
+        // Load all data from Firestore
+        const data = await loadUserData(uid);
+        const defaultStats = { xp: 0, level: 1, currentStreak: 0, highestStreak: 0, lastActive: null, moodLogs: {}, hadPerfectDay: false, preferences: { sound: true, name: user.displayName || 'User', accentColor: '#0097a7', theme: 'dark' } };
+
+        if (data.habits?.length) setHabits(data.habits);
+        if (data.tasks?.length) setTasks(data.tasks);
+        if (data.logs?.length) setLogs(data.logs);
+        if (data.categories?.length) setCategories(data.categories);
+        if (data.focusSessions?.length) setFocusSessions(data.focusSessions);
+        if (data.stats) setUserStats(prev => ({ ...defaultStats, ...prev, ...data.stats }));
+
+        setFirestoreReady(true);
+        console.log('[Firebase] Data loaded ✅');
+      } catch (e) {
+        console.error('[Firebase] Load error:', e);
+        setFirestoreReady(true); // fallback to localStorage
+      }
+    };
+    init();
+  }, [uid]);
+
+  // ── Sync helpers: save to Firestore after state updates ───
+  const syncItem = useCallback((colName, item) => {
+    if (uid && firestoreReady) saveItem(uid, colName, item).catch(console.error);
+  }, [uid, firestoreReady]);
+
+  const removeItem = useCallback((colName, itemId) => {
+    if (uid && firestoreReady) deleteItem(uid, colName, itemId).catch(console.error);
+  }, [uid, firestoreReady]);
 
   const requestNotificationPermission = useCallback(async () => {
     if (!('Notification' in window)) return 'unsupported';
@@ -140,21 +188,51 @@ export const HabitProvider = ({ children }) => {
   }, [userStats.preferences?.theme]);
 
   const addFocusSession = useCallback((session) => {
-    setFocusSessions(prev => [{ id: uuidv4(), ...session, completedAt: new Date().toISOString() }, ...prev].slice(0, 50));
-  }, []);
+    const newSession = { id: uuidv4(), ...session, completedAt: new Date().toISOString() };
+    setFocusSessions(prev => [newSession, ...prev].slice(0, 50));
+    syncItem('focusSessions', newSession);
+  }, [syncItem]);
 
-  const addHabit = useCallback((data) => setHabits(prev => [...prev, { id: uuidv4(), createdAt: new Date().toISOString(), status: 'active', streak: 0, ...data }]), []);
-  const editHabit = useCallback((id, upd) => setHabits(prev => prev.map(h => h.id === id ? { ...h, ...upd } : h)), []);
-  const deleteHabit = useCallback((id) => setHabits(prev => prev.filter(h => h.id !== id)), []);
-  
+  const addHabit = useCallback((data) => {
+    const newHabit = { id: uuidv4(), createdAt: new Date().toISOString(), status: 'active', streak: 0, ...data };
+    setHabits(prev => [...prev, newHabit]);
+    syncItem('habits', newHabit);
+  }, [syncItem]);
+  const editHabit = useCallback((id, upd) => {
+    setHabits(prev => {
+      const updated = prev.map(h => h.id === id ? { ...h, ...upd } : h);
+      const item = updated.find(h => h.id === id);
+      if (item) syncItem('habits', item);
+      return updated;
+    });
+  }, [syncItem]);
+  const deleteHabit = useCallback((id) => {
+    setHabits(prev => prev.filter(h => h.id !== id));
+    removeItem('habits', id);
+  }, [removeItem]);
+
   const resetNotificationFlags = useCallback(() => {
     setHabits(prev => prev.map(h => ({ ...h, lastNotified: undefined, lastNotifiedTs: 0 })));
     setTasks(prev => prev.map(t => ({ ...t, lastNotified: undefined })));
   }, []);
-  
-  const addTask = useCallback((data) => setTasks(prev => [...prev, { id: uuidv4(), createdAt: new Date().toISOString(), completed: false, ...data }]), []);
-  const editTask = useCallback((id, upd) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...upd } : t)), []);
-  const deleteTask = useCallback((id) => setTasks(prev => prev.filter(t => t.id !== id)), []);
+
+  const addTask = useCallback((data) => {
+    const newTask = { id: uuidv4(), createdAt: new Date().toISOString(), completed: false, ...data };
+    setTasks(prev => [...prev, newTask]);
+    syncItem('tasks', newTask);
+  }, [syncItem]);
+  const editTask = useCallback((id, upd) => {
+    setTasks(prev => {
+      const updated = prev.map(t => t.id === id ? { ...t, ...upd } : t);
+      const item = updated.find(t => t.id === id);
+      if (item) syncItem('tasks', item);
+      return updated;
+    });
+  }, [syncItem]);
+  const deleteTask = useCallback((id) => {
+    setTasks(prev => prev.filter(t => t.id !== id));
+    removeItem('tasks', id);
+  }, [removeItem]);
 
   const calculateEntityXP = useCallback((entity) => {
     const base = entity.type === 'habit' ? 50 : 30;
@@ -188,12 +266,30 @@ export const HabitProvider = ({ children }) => {
     });
   }, [calculateEntityXP, updateXP]);
 
-  const addCategory = useCallback((data) => setCategories(prev => [...prev, { id: uuidv4(), ...data }]), []);
-  const editCategory = useCallback((id, upd) => setCategories(prev => prev.map(c => c.id === id ? { ...c, ...upd } : c)), []);
-  const deleteCategory = useCallback((id) => setCategories(prev => prev.filter(c => c.id !== id)), []);
+  const addCategory = useCallback((data) => {
+    const newCat = { id: uuidv4(), ...data };
+    setCategories(prev => [...prev, newCat]);
+    syncItem('categories', newCat);
+  }, [syncItem]);
+  const editCategory = useCallback((id, upd) => {
+    setCategories(prev => {
+      const updated = prev.map(c => c.id === id ? { ...c, ...upd } : c);
+      const item = updated.find(c => c.id === id);
+      if (item) syncItem('categories', item);
+      return updated;
+    });
+  }, [syncItem]);
+  const deleteCategory = useCallback((id) => {
+    setCategories(prev => prev.filter(c => c.id !== id));
+    removeItem('categories', id);
+  }, [removeItem]);
 
   const updatePreferences = useCallback((updates) => {
     setUserStats(prev => ({ ...prev, preferences: { ...prev.preferences, ...updates } }));
+  }, []);
+
+  const logout = useCallback(async () => {
+    await signOut();
   }, []);
 
   const resetData = useCallback(() => {
@@ -302,7 +398,7 @@ export const HabitProvider = ({ children }) => {
         return { ...prev, hadPerfectDay: isPerfectDay || prev.hadPerfectDay };
       });
     }
-  }, [logs, habits, selectedDate, calculateEntityXP, updateXP]);
+  }, [logs, habits, selectedDate, calculateEntityXP, updateXP, syncItem]);
 
   const clearFocusSessions = useCallback(() => setFocusSessions([]), []);
 
@@ -375,16 +471,44 @@ export const HabitProvider = ({ children }) => {
     return () => clearInterval(interval);
   }, [habits, tasks, logs, notificationPermission, sendNotification, editHabit, editTask]);
 
+  // Sync stats to Firestore whenever they change (debounced)
+  const statsTimerRef = useRef(null);
+  useEffect(() => {
+    if (!uid || !firestoreReady) return;
+    clearTimeout(statsTimerRef.current);
+    statsTimerRef.current = setTimeout(() => {
+      saveStats(uid, userStats).catch(console.error);
+    }, 1500);
+    return () => clearTimeout(statsTimerRef.current);
+  }, [userStats, uid, firestoreReady]);
+
+  // Sync logs to Firestore whenever they change
+  const prevLogsRef = useRef(logs);
+  useEffect(() => {
+    if (!uid || !firestoreReady) return;
+    const prev = prevLogsRef.current;
+    const added = logs.filter(l => !prev.find(p => p.id === l.id));
+    const removed = prev.filter(p => !logs.find(l => l.id === p.id));
+    const updated = logs.filter(l => {
+      const old = prev.find(p => p.id === l.id);
+      return old && JSON.stringify(old) !== JSON.stringify(l);
+    });
+    [...added, ...updated].forEach(l => syncItem('logs', l));
+    removed.forEach(l => removeItem('logs', l.id));
+    prevLogsRef.current = logs;
+  }, [logs, uid, firestoreReady, syncItem, removeItem]);
+
   const dataValue = useMemo(() => ({
-    categories, habits, tasks, logs, selectedDate, userStats, focusSessions, notificationPermission
-  }), [categories, habits, tasks, logs, selectedDate, userStats, focusSessions, notificationPermission]);
+    categories, habits, tasks, logs, selectedDate, userStats, focusSessions, notificationPermission,
+    currentUser: user, firestoreReady,
+  }), [categories, habits, tasks, logs, selectedDate, userStats, focusSessions, notificationPermission, user, firestoreReady]);
 
   const actionsValue = useMemo(() => ({
     setSelectedDate, requestNotificationPermission, sendNotification, resetNotificationFlags,
-    addCategory, editCategory, deleteCategory, addHabit, editHabit, deleteHabit, addTask, editTask, toggleTask, deleteTask, getLogsForDate, logHabitProgress, updatePreferences, resetData, addFocusSession, clearFocusSessions
+    addCategory, editCategory, deleteCategory, addHabit, editHabit, deleteHabit, addTask, editTask, toggleTask, deleteTask, getLogsForDate, logHabitProgress, updatePreferences, resetData, addFocusSession, clearFocusSessions, logout,
   }), [
     setSelectedDate, requestNotificationPermission, sendNotification, resetNotificationFlags,
-    addCategory, editCategory, deleteCategory, addHabit, editHabit, deleteHabit, addTask, editTask, toggleTask, deleteTask, getLogsForDate, logHabitProgress, updatePreferences, resetData, addFocusSession, clearFocusSessions
+    addCategory, editCategory, deleteCategory, addHabit, editHabit, deleteHabit, addTask, editTask, toggleTask, deleteTask, getLogsForDate, logHabitProgress, updatePreferences, resetData, addFocusSession, clearFocusSessions, logout,
   ]);
 
   return (

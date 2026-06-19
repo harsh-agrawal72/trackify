@@ -23,3 +23,8 @@ dev-dist
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables (Firebase keys - DO NOT commit)
+.env
+.env.local
+.env.production

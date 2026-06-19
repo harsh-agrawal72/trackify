@@ -4,13 +4,13 @@ import { User, Volume2, ShieldAlert, Check, Download, Palette, Info, Bell } from
 import { motion } from 'framer-motion';
 
 const ACCENT_COLORS = [
-  { name: 'Teal',    value: '#0097a7' },
-  { name: 'Orange',  value: '#f39c12' },
-  { name: 'Purple',  value: '#8e44ad' },
-  { name: 'Rose',    value: '#D84B6B' },
-  { name: 'Blue',    value: '#3498db' },
-  { name: 'Coral',   value: '#FF6B6B' },
-  { name: 'Lime',    value: '#27ae60' },
+  { name: 'Teal', value: '#0097a7' },
+  { name: 'Orange', value: '#f39c12' },
+  { name: 'Purple', value: '#8e44ad' },
+  { name: 'Rose', value: '#D84B6B' },
+  { name: 'Blue', value: '#3498db' },
+  { name: 'Coral', value: '#FF6B6B' },
+  { name: 'Lime', value: '#27ae60' },
 ];
 
 const Settings = () => {
@@ -157,24 +157,24 @@ const Settings = () => {
               <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Status: <span style={{ color: notificationPermission === 'granted' ? 'var(--accent-success)' : 'var(--accent-danger)', fontWeight: 'bold' }}>{notificationPermission.toUpperCase()}</span></div>
             </div>
             {notificationPermission !== 'granted' && (
-              <button 
+              <button
                 onClick={requestNotificationPermission}
-                className="btn btn-primary" 
+                className="btn btn-primary"
                 style={{ padding: '8px 16px', fontSize: '13px' }}
               >
                 Enable
               </button>
             )}
           </div>
-          
+
           <div style={rowStyle}>
             <div>
               <div style={{ fontWeight: '600', marginBottom: '4px' }}>Test Notifications</div>
               <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Verify that reminders will reach your desktop.</div>
             </div>
-            <button 
+            <button
               onClick={() => sendNotification('Test Reminder 🔔', 'This is how your habit reminders will look!', 'test-notification')}
-              className="btn" 
+              className="btn"
               style={{ background: 'var(--bg-base)', border: '1px solid var(--stroke-subtle)', color: 'var(--text-primary)', flexShrink: 0 }}
               disabled={notificationPermission !== 'granted'}
             >
@@ -190,12 +190,12 @@ const Settings = () => {
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Clear "already notified" flags for testing.</div>
               </div>
-              <button 
+              <button
                 onClick={() => {
                   resetNotificationFlags();
                   alert("Notification flags reset! You can now test reminders again.");
                 }}
-                className="btn btn-secondary" 
+                className="btn btn-secondary"
                 style={{ padding: '8px 16px', fontSize: '13px' }}
               >
                 Reset Status
