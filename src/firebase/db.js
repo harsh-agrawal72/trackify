@@ -86,7 +86,7 @@ export const migrateFromLocalStorage = async (uid) => {
       try {
         const val = localStorage.getItem(`${p}${key}`);
         if (val) return JSON.parse(val);
-      } catch {}
+      } catch { }
     }
     return null;
   };

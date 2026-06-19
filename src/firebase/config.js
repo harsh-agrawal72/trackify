@@ -11,6 +11,11 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+console.log("Firebase Config Load Check:", {
+  keyExists: !!firebaseConfig.apiKey,
+  keyLength: firebaseConfig.apiKey ? firebaseConfig.apiKey.length : 0,
+});
+
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);

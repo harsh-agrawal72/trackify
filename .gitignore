@@ -28,3 +28,7 @@ dev-dist
 .env
 .env.local
 .env.production
+serviceAccountKey.json
+server/.env
+server/serviceAccountKey.json
+server/node_modules

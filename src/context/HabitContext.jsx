@@ -125,7 +125,7 @@ export const HabitProvider = ({ children }) => {
         setNotificationPermission(Notification.permission);
       }
     };
-    
+
     window.addEventListener('focus', syncPermission);
     return () => window.removeEventListener('focus', syncPermission);
   }, []);
@@ -142,7 +142,7 @@ export const HabitProvider = ({ children }) => {
     }
 
     if (Notification.permission !== 'granted') return;
-    
+
     const options = {
       body,
       tag: tag || 'habit-reminder',
@@ -151,7 +151,7 @@ export const HabitProvider = ({ children }) => {
       vibrate: [100, 50, 100],
       requireInteraction: true
     };
-    
+
     try {
       if ('serviceWorker' in navigator) {
         const registration = await Promise.race([
@@ -181,7 +181,7 @@ export const HabitProvider = ({ children }) => {
     const accent = userStats?.preferences?.accentColor || '#0097a7';
     document.documentElement.style.setProperty('--accent-primary', accent);
   }, [userStats?.preferences?.accentColor]);
-  
+
   useEffect(() => {
     const theme = userStats.preferences?.theme || 'dark';
     document.documentElement.classList.toggle('light-mode', theme === 'light');
@@ -311,7 +311,7 @@ export const HabitProvider = ({ children }) => {
     let newLogs = [...logs];
     let isCompletedToday = false;
     const isAtMost = habit.goalType === 'at_most';
-    
+
     const checkSuccess = (h, prog) => {
       if (h.goalType === 'at_most') {
         if (h.targetUnit === 'binary') return prog === 0;
@@ -363,28 +363,28 @@ export const HabitProvider = ({ children }) => {
         setLogs(newLogs);
         return;
       }
-      if (amount <= 0 && !isAtMost) return; 
-      
+      if (amount <= 0 && !isAtMost) return;
+
       const newProgress = amount;
       const isSuccessfulNow = checkSuccess(habit, newProgress);
 
-      newLogs.push({ 
-        id: uuidv4(), habitId, date: dateStr, progress: newProgress, 
-        completedAt: (!isAtMost && isSuccessfulNow) ? new Date().toISOString() : null 
+      newLogs.push({
+        id: uuidv4(), habitId, date: dateStr, progress: newProgress,
+        completedAt: (!isAtMost && isSuccessfulNow) ? new Date().toISOString() : null
       });
 
       if (!isAtMost && isSuccessfulNow) isCompletedToday = true;
       if (isAtMost && !isSuccessfulNow) {
-         updateXP(-calculateEntityXP(habit), habit.name, 'habit', "Limit Exceeded! ⚠️");
+        updateXP(-calculateEntityXP(habit), habit.name, 'habit', "Limit Exceeded! ⚠️");
       } else if (!isAtMost && isSuccessfulNow) {
-         updateXP(calculateEntityXP(habit), habit.name, 'habit');
+        updateXP(calculateEntityXP(habit), habit.name, 'habit');
       }
     }
     setLogs(newLogs);
-    
+
     if (isCompletedToday) {
       setUserStats(prev => {
-        const todayActiveDayHabits = habits.filter(h => h.status === 'active' && (h.frequencyDays || [0,1,2,3,4,5,6]).includes(new Date(dateStr).getDay()));
+        const todayActiveDayHabits = habits.filter(h => h.status === 'active' && (h.frequencyDays || [0, 1, 2, 3, 4, 5, 6]).includes(new Date(dateStr).getDay()));
         const completedAfter = [...newLogs].filter(l => {
           const h = habits.find(hb => hb.id === l.habitId);
           if (!h) return false;
@@ -411,12 +411,12 @@ export const HabitProvider = ({ children }) => {
       const currentDay = now.getDay();
       const currentTime = format(now, 'HH:mm');
       const todayStr = format(now, 'yyyy-MM-dd');
-      
+
       for (const habit of habits) {
         if (habit.status !== 'active') continue;
         if (!habit.reminderTime) continue;
-        if (!(habit.frequencyDays || [0,1,2,3,4,5,6]).includes(currentDay)) continue;
-        
+        if (!(habit.frequencyDays || [0, 1, 2, 3, 4, 5, 6]).includes(currentDay)) continue;
+
         const log = logs.find(l => l.habitId === habit.id && l.date === todayStr);
         const isDone = log ? (habit.goalType === 'at_most' ? (log.completedAt && log.progress <= habit.target) : log.progress >= habit.target) : false;
         if (isDone) continue;
@@ -424,24 +424,24 @@ export const HabitProvider = ({ children }) => {
         if (habit.reminderType === 'interval') {
           const intervalMs = (habit.reminderInterval || 60) * 60000;
           const lastNotifiedTs = habit.lastNotifiedTs || 0;
-          const lastNotifiedDay = habit.lastNotified; 
+          const lastNotifiedDay = habit.lastNotified;
           const endTime = habit.reminderEndTime || '23:59';
-          
+
           if (currentTime > endTime) continue;
 
           if (lastNotifiedDay !== todayStr) {
-             if (habit.reminderTime <= currentTime) {
-                await sendNotification(`Habit Reminder: ${habit.name}`, `Time for your regular check!`, `habit-${habit.id}`);
-                showXPToast(`Reminder: ${habit.name}`, 0, 'task');
-                editHabit(habit.id, { lastNotified: todayStr, lastNotifiedTs: Date.now() });
-             }
-             continue;
+            if (habit.reminderTime <= currentTime) {
+              await sendNotification(`Habit Reminder: ${habit.name}`, `Time for your regular check!`, `habit-${habit.id}`);
+              showXPToast(`Reminder: ${habit.name}`, 0, 'task');
+              editHabit(habit.id, { lastNotified: todayStr, lastNotifiedTs: Date.now() });
+            }
+            continue;
           }
 
           if (Date.now() - lastNotifiedTs >= intervalMs) {
-             await sendNotification(`Habit Reminder: ${habit.name}`, `It's been ${habit.reminderInterval} mins, time to go again!`, `habit-${habit.id}`);
-             showXPToast(`Reminder: ${habit.name}`, 0, 'task');
-             editHabit(habit.id, { lastNotified: todayStr, lastNotifiedTs: Date.now() });
+            await sendNotification(`Habit Reminder: ${habit.name}`, `It's been ${habit.reminderInterval} mins, time to go again!`, `habit-${habit.id}`);
+            showXPToast(`Reminder: ${habit.name}`, 0, 'task');
+            editHabit(habit.id, { lastNotified: todayStr, lastNotifiedTs: Date.now() });
           }
         } else {
           if (habit.lastNotified === todayStr) continue;
@@ -457,7 +457,7 @@ export const HabitProvider = ({ children }) => {
         if (task.completed || !task.reminderTime || task.lastNotified === todayStr) return;
         const taskDate = task.date || task.startDate;
         if (taskDate && !isSameDay(new Date(taskDate), now) && task.type !== 'recurring_task') return;
-        if (task.type === 'recurring_task' && !(task.frequencyDays || [0,1,2,3,4,5,6]).includes(currentDay)) return;
+        if (task.type === 'recurring_task' && !(task.frequencyDays || [0, 1, 2, 3, 4, 5, 6]).includes(currentDay)) return;
 
         if (task.reminderTime <= currentTime) {
           sendNotification(`Task Reminder: ${task.name}`, `Don't forget to complete your task!`, `task-${task.id}`);
