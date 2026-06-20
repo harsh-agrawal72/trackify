@@ -459,8 +459,72 @@ export const HabitProvider = ({ children }) => {
 
   const clearFocusSessions = useCallback(() => setFocusSessions([]), []);
 
-  // All habit/task reminders are handled by the Node.js backend via Web Push.
-  // No local reminder logic needed here.
+  // Background reminder checker
+  useEffect(() => {
+    if (notificationPermission !== 'granted') return;
+
+    const checkReminders = async () => {
+      const now = new Date();
+      const currentDay = now.getDay();
+      const currentTime = format(now, 'HH:mm');
+      const todayStr = format(now, 'yyyy-MM-dd');
+
+      for (const habit of habits) {
+        if (habit.status !== 'active') continue;
+        if (!habit.reminderTime) continue;
+        if (!(habit.frequencyDays || [0, 1, 2, 3, 4, 5, 6]).includes(currentDay)) continue;
+
+        const log = logs.find(l => l.habitId === habit.id && l.date === todayStr);
+        const isDone = log ? (habit.goalType === 'at_most' ? (log.completedAt && log.progress <= habit.target) : log.progress >= habit.target) : false;
+        if (isDone) continue;
+
+        if (habit.reminderType === 'interval') {
+          const intervalMs = (habit.reminderInterval || 60) * 60000;
+          const lastNotifiedTs = habit.lastNotifiedTs || 0;
+          const lastNotifiedDay = habit.lastNotified;
+          const endTime = habit.reminderEndTime || '23:59';
+
+          if (currentTime > endTime) continue;
+
+          if (lastNotifiedDay !== todayStr) {
+            if (habit.reminderTime <= currentTime) {
+              await sendNotification(`Habit Reminder: ${habit.name}`, `Time for your regular check!`, `habit-${habit.id}`);
+              showXPToast(`Reminder: ${habit.name}`, 0, 'task');
+              editHabit(habit.id, { lastNotified: todayStr, lastNotifiedTs: Date.now() });
+            }
+            continue;
+          }
+
+          if (Date.now() - lastNotifiedTs >= intervalMs) {
+            await sendNotification(`Habit Reminder: ${habit.name}`, `It's been ${habit.reminderInterval} mins, time to go again!`, `habit-${habit.id}`);
+            showXPToast(`Reminder: ${habit.name}`, 0, 'task');
+            editHabit(habit.id, { lastNotified: todayStr, lastNotifiedTs: Date.now() });
+          }
+        } else {
+          if (habit.lastNotified === todayStr) continue;
+          if (habit.reminderTime <= currentTime) {
+            await sendNotification(`Habit Reminder: ${habit.name}`, `Time to work on your habit!`, `habit-${habit.id}`);
+            showXPToast(`Reminder: ${habit.name}`, 0, 'task');
+            editHabit(habit.id, { lastNotified: todayStr });
+          }
+        }
+      }
+
+      tasks.forEach(task => {
+        if (task.completed || !task.reminderTime || task.lastNotified === todayStr) return;
+        const taskDate = task.date || task.startDate;
+        if (taskDate && !isSameDay(new Date(taskDate), now) && task.type !== 'recurring_task') return;
+        if (task.type === 'recurring_task' && !(task.frequencyDays || [0, 1, 2, 3, 4, 5, 6]).includes(currentDay)) return;
+
+        if (task.reminderTime <= currentTime) {
+          sendNotification(`Task Reminder: ${task.name}`, `Don't forget to complete your task!`, `task-${task.id}`);
+          editTask(task.id, { lastNotified: todayStr });
+        }
+      });
+    };
+    // Frontend fallback notifications removed to prevent duplicates with Web Push.
+    // The Node.js backend handles all scheduled notifications 24/7.
+  }, [habits, tasks, logs, notificationPermission, sendNotification, editHabit, editTask]);
 
   // Sync stats to Firestore whenever they change (debounced)
   const statsTimerRef = useRef(null);
