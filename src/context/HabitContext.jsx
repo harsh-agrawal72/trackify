@@ -522,10 +522,8 @@ export const HabitProvider = ({ children }) => {
         }
       });
     };
-
-    const interval = setInterval(checkReminders, 60000);
-    checkReminders();
-    return () => clearInterval(interval);
+    // Frontend fallback notifications removed to prevent duplicates with Web Push.
+    // The Node.js backend handles all scheduled notifications 24/7.
   }, [habits, tasks, logs, notificationPermission, sendNotification, editHabit, editTask]);
 
   // Sync stats to Firestore whenever they change (debounced)

@@ -106,134 +106,142 @@ const Habits = () => {
     filteredHabits = filteredHabits.filter(h => h.categoryId === filterCat);
   }
 
-  const renderHabitCard = (habit, cat) => {
-    let currentStreak = 0;
-    const isAtMost = habit.goalType === 'at_most';
-    for (let i = 0; i < 365; i++) {
-      const d = subDays(new Date(), i);
-      if (!(habit.frequencyDays || [0,1,2,3,4,5,6]).includes(d.getDay())) continue;
-      const dateStr = format(d, 'yyyy-MM-dd');
-      const log = logs.find(l => l.habitId === habit.id && l.date === dateStr);
-      const isAtMostBinary = isAtMost && habit.targetUnit === 'binary';
-      const isSuccessful = isAtMost 
-        ? (log && log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= habit.target)) 
-        : (log && log.progress >= habit.target);
-      
-      if (isSuccessful) {
-        currentStreak++;
-      } else if (i !== 0) {
-        break;
-      }
-    }
+  // Precompute logs map for O(1) lookups in loops, eliminating massive React overhead
+  const logsMap = React.useMemo(() => {
+    const map = {};
+    logs.forEach(log => {
+      map[`${log.habitId}_${log.date}`] = log;
+    });
+    return map;
+  }, [logs]);
 
-    let totalScheduled = 0;
-    let totalCompleted = 0;
-    for (let i = 0; i < 30; i++) {
-      const d = subDays(new Date(), i);
-      if (!(habit.frequencyDays || [0,1,2,3,4,5,6]).includes(d.getDay())) continue;
-      const start = new Date(habit.startDate || '2000-01-01');
-      start.setHours(0,0,0,0);
-      if (d < start) break;
-      
-      totalScheduled++;
-      const dateStr = format(d, 'yyyy-MM-dd');
-      const log = logs.find(l => l.habitId === habit.id && l.date === dateStr);
-      const isAtMostBinary = isAtMost && habit.targetUnit === 'binary';
-      const isSuccessful = isAtMost 
-        ? (log && log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= habit.target)) 
-        : (log && log.progress >= habit.target);
-      if (isSuccessful) totalCompleted++;
+// Memoized Habit Card to prevent re-rendering 400,000+ loops on every keystroke
+const HabitCard = React.memo(({ habit, cat, logsMap, handleHistoricalToggle, setSelectedHabitHistory, setSelectedHabitVelocity, setEditingHabit, deleteHabit }) => {
+  const last7Days = Array.from({ length: 7 }).map((_, idx) => subDays(new Date(), 6 - idx));
+  
+  let currentStreak = 0;
+  const isAtMost = habit.goalType === 'at_most';
+  for (let i = 0; i < 365; i++) {
+    const d = subDays(new Date(), i);
+    if (!(habit.frequencyDays || [0,1,2,3,4,5,6]).includes(d.getDay())) continue;
+    const dateStr = format(d, 'yyyy-MM-dd');
+    const log = logsMap[`${habit.id}_${dateStr}`];
+    const isAtMostBinary = isAtMost && habit.targetUnit === 'binary';
+    const isSuccessful = isAtMost 
+      ? (log && log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= habit.target)) 
+      : (log && log.progress >= habit.target);
+    
+    if (isSuccessful) {
+      currentStreak++;
+    } else if (i !== 0) {
+      break;
     }
-    const completionRate = totalScheduled === 0 ? 0 : Math.round((totalCompleted / totalScheduled) * 100);
+  }
 
-    return (
-      <div key={habit.id} className="glass-panel" style={{ padding: '24px', position: 'relative', overflow: 'hidden' }}>
-        {/* Category Accent Stripe */}
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: cat.color || 'var(--accent-primary)' }} />
-        
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <h3 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '6px', color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>{habit.name}</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', padding: '2px 10px', borderRadius: '99px', background: `${cat.color || 'var(--accent-primary)'}22`, color: cat.color || 'var(--accent-primary)', fontWeight: '700', textTransform: 'uppercase' }}>
-                {cat.name || 'General'}
-              </span>
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>Daily Goal: {habit.target} {habit.targetUnit}</span>
-            </div>
-          </div>
-          <div style={{ 
-            width: '44px', height: '44px', borderRadius: '14px', 
-            background: `linear-gradient(135deg, ${cat.color || 'var(--accent-primary)'}, ${cat.color}dd)`, 
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: `0 8px 16px ${cat.color}44`, flexShrink: 0
-          }}>
-            {getIcon(cat.icon)}
+  let totalScheduled = 0;
+  let totalCompleted = 0;
+  for (let i = 0; i < 30; i++) {
+    const d = subDays(new Date(), i);
+    if (!(habit.frequencyDays || [0,1,2,3,4,5,6]).includes(d.getDay())) continue;
+    const start = new Date(habit.startDate || '2000-01-01');
+    start.setHours(0,0,0,0);
+    if (d < start) break;
+    
+    totalScheduled++;
+    const dateStr = format(d, 'yyyy-MM-dd');
+    const log = logsMap[`${habit.id}_${dateStr}`];
+    const isAtMostBinary = isAtMost && habit.targetUnit === 'binary';
+    const isSuccessful = isAtMost 
+      ? (log && log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= habit.target)) 
+      : (log && log.progress >= habit.target);
+    if (isSuccessful) totalCompleted++;
+  }
+  const completionRate = totalScheduled === 0 ? 0 : Math.round((totalCompleted / totalScheduled) * 100);
+
+  return (
+    <div className="glass-panel" style={{ padding: '24px', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: cat.color || 'var(--accent-primary)' }} />
+      
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h3 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '6px', color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>{habit.name}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '12px', padding: '2px 10px', borderRadius: '99px', background: `${cat.color || 'var(--accent-primary)'}22`, color: cat.color || 'var(--accent-primary)', fontWeight: '700', textTransform: 'uppercase' }}>
+              {cat.name || 'General'}
+            </span>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>Daily Goal: {habit.target} {habit.targetUnit}</span>
           </div>
         </div>
-
-        {/* 7-Day Visualizer */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', marginBottom: '24px', overflowX: 'auto', gap: '10px' }}>
-          {last7Days.map((date, i) => {
-            const dateStr = format(date, 'yyyy-MM-dd');
-            const log = logs.find(l => l.habitId === habit.id && l.date === dateStr);
-            const isAtMost = habit.goalType === 'at_most';
-            const isAtMostBinary = isAtMost && habit.targetUnit === 'binary';
-            const isCompleted = isAtMost 
-              ? (log && log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= habit.target)) 
-              : (log && log.progress >= habit.target);
-            const isToday = isSameDay(date, new Date());
-            
-            const startD = new Date(habit.startDate || '2000-01-01');
-            startD.setHours(0,0,0,0);
-            const isBeforeStart = date < startD;
-            const isScheduled = (habit.frequencyDays || [0,1,2,3,4,5,6]).includes(date.getDay()) && !isBeforeStart;
-
-            return (
-              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '42px' }}>
-                <span style={{ fontSize: '10px', color: isToday ? 'var(--accent-primary)' : 'var(--text-muted)', fontWeight: '800' }}>
-                  {format(date, 'EEE')}
-                </span>
-                <button
-                  onClick={() => isScheduled && handleHistoricalToggle(habit, date)}
-                  style={{
-                    width: '38px', height: '38px', borderRadius: '12px',
-                    border: 'none',
-                    background: isCompleted ? (cat.color || 'var(--accent-primary)') : isToday ? 'rgba(255,255,255,0.08)' : 'transparent',
-                    color: isCompleted ? '#fff' : isToday ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '14px', fontWeight: '800', cursor: isScheduled ? 'pointer' : 'default',
-                    opacity: isBeforeStart ? 0.2 : isScheduled ? 1 : 0.3,
-                    boxShadow: isCompleted ? `0 4px 12px ${cat.color}66` : 'none',
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                  }}>
-                  {format(date, 'd')}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Bottom Actions & Stats */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,140,66,0.1)', color: '#FF8C42', fontSize: '13px', fontWeight: '700' }}>
-              <Flame size={14} /> {currentStreak}d
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(46,204,113,0.1)', color: '#2ecc71', fontSize: '13px', fontWeight: '700' }}>
-              <TrendingUp size={14} /> {completionRate}%
-            </div>
-          </div>
-          
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => setSelectedHabitHistory(habit)} className="btn-icon" title="History"><CalendarDays size={18} /></button>
-            <button onClick={() => setSelectedHabitVelocity(habit)} className="btn-icon" title="Trends"><TrendingUp size={18} /></button>
-            <button onClick={() => setEditingHabit(habit)} className="btn-icon" title="Edit"><Edit2 size={18} /></button>
-            <button onClick={() => window.confirm('Delete?') && deleteHabit(habit.id)} className="btn-icon" style={{ color: 'rgba(231,76,60,0.6)' }}><Trash2 size={18} /></button>
-          </div>
+        <div style={{ 
+          width: '44px', height: '44px', borderRadius: '14px', 
+          background: `linear-gradient(135deg, ${cat.color || 'var(--accent-primary)'}, ${cat.color}dd)`, 
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: `0 8px 16px ${cat.color}44`, flexShrink: 0
+        }}>
+          {getIcon(cat.icon)}
         </div>
       </div>
-    );
-  };
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', marginBottom: '24px', overflowX: 'auto', gap: '10px' }}>
+        {last7Days.map((date, i) => {
+          const dateStr = format(date, 'yyyy-MM-dd');
+          const log = logsMap[`${habit.id}_${dateStr}`];
+          const isAtMostBinary = isAtMost && habit.targetUnit === 'binary';
+          const isCompleted = isAtMost 
+            ? (log && log.completedAt && (isAtMostBinary ? log.progress === 0 : log.progress <= habit.target)) 
+            : (log && log.progress >= habit.target);
+          const isToday = isSameDay(date, new Date());
+          
+          const startD = new Date(habit.startDate || '2000-01-01');
+          startD.setHours(0,0,0,0);
+          const isBeforeStart = date < startD;
+          const isScheduled = (habit.frequencyDays || [0,1,2,3,4,5,6]).includes(date.getDay()) && !isBeforeStart;
+
+          return (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '42px' }}>
+              <span style={{ fontSize: '10px', color: isToday ? 'var(--accent-primary)' : 'var(--text-muted)', fontWeight: '800' }}>
+                {format(date, 'EEE')}
+              </span>
+              <button
+                onClick={() => isScheduled && handleHistoricalToggle(habit, date)}
+                style={{
+                  width: '38px', height: '38px', borderRadius: '12px',
+                  border: 'none',
+                  background: isCompleted ? (cat.color || 'var(--accent-primary)') : isToday ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  color: isCompleted ? '#fff' : isToday ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '14px', fontWeight: '800', cursor: isScheduled ? 'pointer' : 'default',
+                  opacity: isBeforeStart ? 0.2 : isScheduled ? 1 : 0.3,
+                  boxShadow: isCompleted ? `0 4px 12px ${cat.color}66` : 'none',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}>
+                {format(date, 'd')}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,140,66,0.1)', color: '#FF8C42', fontSize: '13px', fontWeight: '700' }}>
+            <Flame size={14} /> {currentStreak}d
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(46,204,113,0.1)', color: '#2ecc71', fontSize: '13px', fontWeight: '700' }}>
+            <TrendingUp size={14} /> {completionRate}%
+          </div>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={() => setSelectedHabitHistory(habit)} className="btn-icon" title="History"><CalendarDays size={18} /></button>
+          <button onClick={() => setSelectedHabitVelocity(habit)} className="btn-icon" title="Trends"><TrendingUp size={18} /></button>
+          <button onClick={() => setEditingHabit(habit)} className="btn-icon" title="Edit"><Edit2 size={18} /></button>
+          <button onClick={() => window.confirm('Are you sure you want to delete this habit? All its history will be permanently lost.') && deleteHabit(habit.id)} className="btn-icon" style={{ color: 'rgba(231,76,60,0.6)' }}><Trash2 size={18} /></button>
+        </div>
+      </div>
+    </div>
+  );
+});
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -323,7 +331,15 @@ const Habits = () => {
                       {cat.name}
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {catHabits.map(habit => renderHabitCard(habit, cat))}
+                      {catHabits.map(habit => (
+                        <HabitCard 
+                          key={habit.id} habit={habit} cat={cat} logsMap={logsMap}
+                          handleHistoricalToggle={handleHistoricalToggle}
+                          setSelectedHabitHistory={setSelectedHabitHistory}
+                          setSelectedHabitVelocity={setSelectedHabitVelocity}
+                          setEditingHabit={setEditingHabit} deleteHabit={deleteHabit}
+                        />
+                      ))}
                     </div>
                   </div>
                 )
@@ -331,7 +347,15 @@ const Habits = () => {
             ) : (
               filteredHabits.map(habit => {
                 const cat = categories.find(c => c.id === habit.categoryId) || {};
-                return renderHabitCard(habit, cat);
+                return (
+                  <HabitCard 
+                    key={habit.id} habit={habit} cat={cat} logsMap={logsMap}
+                    handleHistoricalToggle={handleHistoricalToggle}
+                    setSelectedHabitHistory={setSelectedHabitHistory}
+                    setSelectedHabitVelocity={setSelectedHabitVelocity}
+                    setEditingHabit={setEditingHabit} deleteHabit={deleteHabit}
+                  />
+                );
               })
             )}
           </div>

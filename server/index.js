@@ -118,20 +118,55 @@ cron.schedule('* * * * *', async () => {
   const currentUTCTime = `${utcHours}:${utcMinutes}`;
 
   try {
-    const habitsSnapshot = await db.collectionGroup('habits')
-      .where('reminderTimeUTC', '==', currentUTCTime)
+    // Query ALL habits that have a reminder time set.
+    // We use >= '00:00' to reuse the existing index on reminderTimeUTC without needing a new one.
+    const allRemindersSnapshot = await db.collectionGroup('habits')
+      .where('reminderTimeUTC', '>=', '00:00')
       .get();
 
-    console.log(`[Cron] Found ${habitsSnapshot.size} habits matching UTC time ${currentUTCTime}`);
+    const matchingHabits = [];
 
-    if (!habitsSnapshot.empty) {
-      // Group habits by user to send one push per user or handle subscriptions efficiently
+    // Helper to convert "HH:mm" to total minutes
+    const timeToMins = (timeStr) => {
+      if (!timeStr) return 0;
+      const [h, m] = timeStr.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const currentMins = timeToMins(currentUTCTime);
+
+    allRemindersSnapshot.docs.forEach(doc => {
+      const habit = doc.data();
+      if (!habit.reminderTimeUTC) return;
+
+      const startMins = timeToMins(habit.reminderTimeUTC);
+      
+      // Check 1: Exact Start Time Match
+      if (habit.reminderTimeUTC === currentUTCTime) {
+        matchingHabits.push({ uid: doc.ref.parent.parent.id, data: habit });
+        return; // already matched, move to next
+      }
+
+      // Check 2: Interval Match
+      if (habit.reminderType === 'interval' && habit.reminderInterval) {
+        let diff = currentMins - startMins;
+        if (diff < 0) diff += 24 * 60; // handle UTC midnight wrap-around
+
+        // If difference is a multiple of the interval
+        if (diff > 0 && diff % habit.reminderInterval === 0) {
+          matchingHabits.push({ uid: doc.ref.parent.parent.id, data: habit });
+        }
+      }
+    });
+
+    console.log(`[Cron] Found ${matchingHabits.length} habits triggering at UTC ${currentUTCTime}`);
+
+    if (matchingHabits.length > 0) {
+      // Group habits by user
       const habitsByUser = {};
-      for (const doc of habitsSnapshot.docs) {
-        // Doc ref path: users/{uid}/habits/{habitId}
-        const uid = doc.ref.parent.parent.id;
-        if (!habitsByUser[uid]) habitsByUser[uid] = [];
-        habitsByUser[uid].push(doc.data());
+      for (const item of matchingHabits) {
+        if (!habitsByUser[item.uid]) habitsByUser[item.uid] = [];
+        habitsByUser[item.uid].push(item.data);
       }
 
       for (const [uid, userHabits] of Object.entries(habitsByUser)) {
