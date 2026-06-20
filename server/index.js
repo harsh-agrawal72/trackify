@@ -21,22 +21,30 @@ webpush.setVapidDetails(
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 
-// Initialize Firebase Admin (Wrapped in a try-catch for local dev without key yet)
-let db = null;
+// Initialize Firebase Admin
+let serviceAccount;
 try {
-  const serviceAccountPath = path.join(__dirname, process.env.FIREBASE_SERVICE_ACCOUNT || 'serviceAccountKey.json');
-  if (fs.existsSync(serviceAccountPath)) {
-    const serviceAccount = require(serviceAccountPath);
-    initializeApp({
-      credential: cert(serviceAccount)
-    });
-    db = getFirestore();
-    console.log("Firebase Admin Initialized successfully.");
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
   } else {
-    console.warn("⚠️  serviceAccountKey.json not found at " + serviceAccountPath + "! Firebase Admin is NOT initialized.");
+    const serviceAccountPath = path.join(__dirname, process.env.FIREBASE_SERVICE_ACCOUNT || 'serviceAccountKey.json');
+    if (fs.existsSync(serviceAccountPath)) {
+      serviceAccount = require(serviceAccountPath);
+    }
   }
 } catch (error) {
-  console.error("Error initializing Firebase Admin:", error.message);
+  console.error("Failed to load Firebase Service Account:", error);
+}
+
+let db = null;
+if (serviceAccount) {
+  initializeApp({
+    credential: cert(serviceAccount)
+  });
+  db = getFirestore();
+  console.log("Firebase Admin Initialized successfully.");
+} else {
+  console.error("Firebase Admin not initialized!");
 }
 
 // Basic Health Check Endpoint
@@ -141,11 +149,15 @@ cron.schedule('* * * * *', async () => {
             };
             
             try {
+              console.log(`[Push Debug] Attempting to send webpush to endpoint: ${subscription.endpoint}`);
               await webpush.sendNotification(subscription, JSON.stringify(payload));
-              console.log(`[Push] Sent to user ${uid} for habit: ${habit.name}`);
+              console.log(`[Push Debug] SUCCESS! Web Push delivered to user ${uid} for habit: ${habit.name}`);
             } catch (err) {
-              console.error(`[Push Error] User ${uid}:`, err.statusCode === 410 ? "Subscription Expired" : err);
-              if (err.statusCode === 410) {
+              console.error(`[Push Debug Error] Failed to send push to user ${uid} for habit ${habit.name}.`);
+              console.error(`[Push Debug Error] Status Code: ${err.statusCode}`);
+              console.error(`[Push Debug Error] Error Details:`, err);
+              if (err.statusCode === 410 || err.statusCode === 404) {
+                console.log(`[Push Debug] Deleting expired/invalid subscription for user ${uid}.`);
                 await db.collection('users').doc(uid).collection('push').doc('subscription').delete();
               }
             }

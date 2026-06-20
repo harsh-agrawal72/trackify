@@ -14,6 +14,7 @@ self.addEventListener('activate', (event) => {
 
 // Handle Push Notifications
 self.addEventListener('push', function (event) {
+  console.log('[SW] Push event received!', event);
   if (event.data) {
     try {
       const data = event.data.json();
