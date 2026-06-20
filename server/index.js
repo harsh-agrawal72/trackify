@@ -184,8 +184,12 @@ cron.schedule('* * * * *', async () => {
             };
             
             try {
+              const options = {
+                TTL: 86400, // 24 hours
+                urgency: 'high'
+              };
               console.log(`[Push Debug] Attempting to send webpush to endpoint: ${subscription.endpoint}`);
-              await webpush.sendNotification(subscription, JSON.stringify(payload));
+              await webpush.sendNotification(subscription, JSON.stringify(payload), options);
               console.log(`[Push Debug] SUCCESS! Web Push delivered to user ${uid} for habit: ${habit.name}`);
             } catch (err) {
               console.error(`[Push Debug Error] Failed to send push to user ${uid} for habit ${habit.name}.`);
