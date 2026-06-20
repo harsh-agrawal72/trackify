@@ -48,27 +48,34 @@ app.get('/', (req, res) => {
 app.get('/debug', async (req, res) => {
   if (!db) return res.json({ error: "DB not initialized" });
   try {
-    const usersSnap = await db.collection('users').get();
     const result = {};
-    for (const userDoc of usersSnap.docs) {
-      const uid = userDoc.id;
-      result[uid] = { habits: [], pushSubscription: false };
+    
+    // Find all habits via collectionGroup
+    const habitsSnap = await db.collectionGroup('habits').get();
+    for (const h of habitsSnap.docs) {
+      const uid = h.ref.parent.parent.id;
+      if (!result[uid]) result[uid] = { habits: [], pushSubscription: false };
       
-      const habitsSnap = await db.collection('users').doc(uid).collection('habits').get();
-      for (const h of habitsSnap.docs) {
-        const data = h.data();
-        result[uid].habits.push({ 
-          id: h.id, 
-          name: data.name, 
-          reminderTime: data.reminderTime,
-          reminder: data.reminder,
-          status: data.status
-        });
-      }
-      
-      const subDoc = await db.collection('users').doc(uid).collection('push').doc('subscription').get();
-      result[uid].pushSubscription = subDoc.exists;
+      const data = h.data();
+      result[uid].habits.push({ 
+        id: h.id, 
+        name: data.name, 
+        reminderTime: data.reminderTime,
+        reminder: data.reminder,
+        status: data.status
+      });
     }
+    
+    // Find all subscriptions via collectionGroup
+    const pushSnap = await db.collectionGroup('push').get();
+    for (const p of pushSnap.docs) {
+      if (p.id === 'subscription') {
+        const uid = p.ref.parent.parent.id;
+        if (!result[uid]) result[uid] = { habits: [], pushSubscription: false };
+        result[uid].pushSubscription = true;
+      }
+    }
+    
     res.json(result);
   } catch (err) {
     res.json({ error: err.message });
@@ -98,16 +105,16 @@ cron.schedule('* * * * *', async () => {
   }
 
   const now = new Date();
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const currentTime = `${hours}:${minutes}`;
+  const utcHours = String(now.getUTCHours()).padStart(2, '0');
+  const utcMinutes = String(now.getUTCMinutes()).padStart(2, '0');
+  const currentUTCTime = `${utcHours}:${utcMinutes}`;
 
   try {
     const habitsSnapshot = await db.collectionGroup('habits')
-      .where('reminderTime', '==', currentTime)
+      .where('reminderTimeUTC', '==', currentUTCTime)
       .get();
 
-    console.log(`[Cron] Found ${habitsSnapshot.size} habits matching time ${currentTime}`);
+    console.log(`[Cron] Found ${habitsSnapshot.size} habits matching UTC time ${currentUTCTime}`);
 
     if (!habitsSnapshot.empty) {
       // Group habits by user to send one push per user or handle subscriptions efficiently

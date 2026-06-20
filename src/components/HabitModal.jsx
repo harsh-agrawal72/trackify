@@ -51,6 +51,17 @@ const HabitModal = ({ onClose, editData }) => {
     });
   };
 
+  const getUTCHoursMinutes = (localTimeStr) => {
+    if (!localTimeStr) return null;
+    const [hours, minutes] = localTimeStr.split(':');
+    const d = new Date();
+    d.setHours(parseInt(hours, 10));
+    d.setMinutes(parseInt(minutes, 10));
+    const utcHours = String(d.getUTCHours()).padStart(2, '0');
+    const utcMinutes = String(d.getUTCMinutes()).padStart(2, '0');
+    return `${utcHours}:${utcMinutes}`;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.name) return;
@@ -62,6 +73,7 @@ const HabitModal = ({ onClose, editData }) => {
       notes: formData.notes,
       difficulty: formData.difficulty,
       reminderTime: formData.isReminderEnabled ? formData.reminderTime : null,
+      reminderTimeUTC: formData.isReminderEnabled ? getUTCHoursMinutes(formData.reminderTime) : null,
       reminderEndTime: formData.reminderEndTime,
       reminderType: formData.reminderType,
       reminderInterval: formData.reminderInterval
