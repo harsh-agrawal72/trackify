@@ -520,10 +520,9 @@ export const HabitProvider = ({ children }) => {
       });
     };
 
-    // Temporarily disabled for debugging Web Push
-    // const interval = setInterval(checkReminders, 60000);
-    // checkReminders();
-    // return () => clearInterval(interval);
+    const interval = setInterval(checkReminders, 60000);
+    checkReminders();
+    return () => clearInterval(interval);
   }, [habits, tasks, logs, notificationPermission, sendNotification, editHabit, editTask]);
 
   // Sync stats to Firestore whenever they change (debounced)
