@@ -144,11 +144,10 @@ export const HabitProvider = ({ children }) => {
     if (permission === 'granted' && uid && 'serviceWorker' in navigator) {
       try {
         const registration = await navigator.serviceWorker.ready;
+        if (!registration) alert("SW Registration failed!");
+
         let subscription = await registration.pushManager.getSubscription();
-        
-        if (subscription) {
-          await subscription.unsubscribe();
-        }
+        if (subscription) await subscription.unsubscribe();
 
         const publicVapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
         if (publicVapidKey) {
@@ -156,17 +155,21 @@ export const HabitProvider = ({ children }) => {
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
           });
+          if (subscription) {
+            await savePushSubscription(uid, subscription);
+            alert("[Push] Subscription successful and saved to Firestore!");
+          } else {
+            alert("Subscription object is null after subscribing!");
+          }
         } else {
-          console.warn("VITE_VAPID_PUBLIC_KEY is not defined in .env!");
-        }
-        
-        if (subscription) {
-          await savePushSubscription(uid, subscription);
-          console.log("[Push] Subscription saved to Firestore.");
+          alert("ERROR: VITE_VAPID_PUBLIC_KEY is NOT defined in Vercel!");
         }
       } catch (err) {
-        console.error("Error setting up push notifications:", err);
+        alert("Push Setup Error: " + err.message);
+        console.error(err);
       }
+    } else {
+      alert(`Conditions failed: perm=${permission}, uid=${uid}, sw=${'serviceWorker' in navigator}`);
     }
     
     return permission;
